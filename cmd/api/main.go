@@ -10,24 +10,26 @@ import (
 	"time"
 
 	"github.com/WilliamCesarSantos/movie-suggestion/config"
-	appusecase "github.com/WilliamCesarSantos/movie-suggestion/internal/application/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/application/suggestion"
+	appusecase "github.com/WilliamCesarSantos/movie-suggestion/internal/application/usecase"
+	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/auth"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/http/handler"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/http/middleware"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/http/router"
-	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/lambda"
 	neo4jinfra "github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/neo4j"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/observability"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/omdb"
+	postgresinfra "github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/postgres"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/sqs"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -43,49 +45,40 @@ func main() {
 	}
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
-	// OTEL tracer
 	shutdownTracer, err := observability.InitTracer(cfg.Otel)
 	if err != nil {
 		logger.Warn().Err(err).Msg("failed to initialize tracer, continuing without tracing")
 	}
 
-	// Prometheus metrics
 	metrics := observability.NewMetrics()
 
-	// Neo4j driver
 	neo4jDriver, err := neo4j.NewDriverWithContext(cfg.Neo4j.URI, neo4j.BasicAuth(cfg.Neo4j.Username, cfg.Neo4j.Password, ""))
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to create neo4j driver")
 	}
 	defer neo4jDriver.Close(context.Background())
 
-	// Repositories
+	db, err := gorm.Open(postgres.Open(cfg.Postgres.DSN), &gorm.Config{})
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to connect to postgres")
+	}
+
 	movieRepo := neo4jinfra.NewMovieRepository(neo4jDriver, cfg.Neo4j.Database)
 	userRepo := neo4jinfra.NewUserRepository(neo4jDriver, cfg.Neo4j.Database)
 	suggestionRepo := neo4jinfra.NewSuggestionRepository(neo4jDriver, cfg.Neo4j.Database)
+	authUserRepo := postgresinfra.NewAuthUserRepository(db)
 
-	// OMDB client
 	omdbClient := omdb.NewClient(cfg.OMDB.BaseURL, cfg.OMDB.APIKey, cfg.OMDB.TimeoutSeconds)
+	omdbSearcher := omdb.NewSearcherAdapter(omdbClient)
 
-	// AWS config
-	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
-		awsconfig.WithRegion(cfg.AWS.Region),
-	)
+	passwordService := auth.NewPasswordService(cfg.Auth.Pepper)
+	jwtService := auth.NewJWTService(cfg.Auth.Secret, cfg.Auth.ExpiryHours)
+
+	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(cfg.AWS.Region))
 	if err != nil {
 		logger.Fatal().Err(err).Msg("failed to load AWS config")
 	}
 
-	// Lambda client with optional custom endpoint
-	var lambdaClient *awslambda.Client
-	if cfg.AWS.Endpoint != "" {
-		lambdaClient = awslambda.NewFromConfig(awsCfg, func(o *awslambda.Options) {
-			o.BaseEndpoint = aws.String(cfg.AWS.Endpoint)
-		})
-	} else {
-		lambdaClient = awslambda.NewFromConfig(awsCfg)
-	}
-
-	// SQS client with optional custom endpoint
 	var sqsClient *awssqs.Client
 	if cfg.AWS.Endpoint != "" {
 		sqsClient = awssqs.NewFromConfig(awsCfg, func(o *awssqs.Options) {
@@ -94,34 +87,29 @@ func main() {
 	} else {
 		sqsClient = awssqs.NewFromConfig(awsCfg)
 	}
+	publisher := sqs.NewPublisher(sqsClient, cfg.SQS.QueueURL)
 
-	authClient := lambda.NewAuthClient(lambdaClient, cfg.Lambda.AuthFunctionName)
-	importClient := lambda.NewImportClient(lambdaClient, cfg.Lambda.ImportFunctionName)
-
-	// Algorithm selector & dispatcher
 	selector := suggestion.NewAlgorithmSelector(cfg.Suggestion.ContentPreferenceThreshold, cfg.Suggestion.CollaborativeMinWatches, cfg.Suggestion.ContentBasedMinWatches)
 	dispatcher := suggestion.NewAlgorithmDispatcher(suggestionRepo)
 
-	// Use cases
 	suggestUC := appusecase.NewSuggestMoviesUseCase(userRepo, suggestionRepo, selector, dispatcher, cfg.Suggestion)
-	importUC := appusecase.NewImportMoviesUseCase(importClient)
+	importUC := appusecase.NewImportMoviesUseCase(omdbSearcher, publisher)
 	manageUserUC := appusecase.NewManageUserUseCase(userRepo, selector)
 	updateProfileUC := appusecase.NewUpdateUserProfileUseCase(userRepo)
 	processImportUC := appusecase.NewProcessMovieImportUseCase(movieRepo, omdbClient, metrics)
+	getMovieUC := appusecase.NewGetMovieUseCase(movieRepo)
+	loginUC := appusecase.NewLoginUseCase(authUserRepo, passwordService, jwtService)
 
-	// HTTP handlers
-	userHandler := handler.NewUserHandler(manageUserUC, suggestUC, updateProfileUC)
-	movieHandler := handler.NewMovieHandler(movieRepo)
-	adminHandler := handler.NewAdminHandler(importUC)
+	userHandler := handler.NewUserHandler(manageUserUC, suggestUC, updateProfileUC, authUserRepo, passwordService)
+	movieHandler := handler.NewMovieHandler(getMovieUC, manageUserUC)
+	importHandler := handler.NewImportHandler(importUC)
+	authHandler := handler.NewAuthHandler(loginUC)
 	healthHandler := handler.NewHealthHandler(neo4jDriver, cfg.Neo4j.Database)
 
-	// Auth middleware
-	authMiddleware := middleware.NewAuthMiddleware(authClient)
+	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
-	// Router
-	r := router.NewRouter(userHandler, movieHandler, adminHandler, healthHandler, authMiddleware, metrics)
+	r := router.NewRouter(userHandler, movieHandler, importHandler, authHandler, healthHandler, authMiddleware, metrics)
 
-	// SQS consumer
 	consumer := sqs.NewConsumer(sqsClient, cfg.SQS.QueueURL, cfg.SQS.WorkerCount, processImportUC, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -129,7 +117,6 @@ func main() {
 
 	go consumer.Start(ctx)
 
-	// Metrics server
 	metricsMux := http.NewServeMux()
 	metricsMux.Handle("/metrics", promhttp.Handler())
 	metricsServer := &http.Server{
@@ -143,7 +130,6 @@ func main() {
 		}
 	}()
 
-	// HTTP server
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler: r,
@@ -156,13 +142,12 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	logger.Info().Msg("shutting down...")
 
-	cancel() // stop SQS workers
+	cancel()
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()

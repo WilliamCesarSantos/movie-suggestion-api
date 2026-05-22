@@ -5,13 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	appusecase "github.com/WilliamCesarSantos/movie-suggestion/internal/application/usecase"
-	"github.com/WilliamCesarSantos/movie-suggestion/internal/application/suggestion"
 	"github.com/WilliamCesarSantos/movie-suggestion/config"
+	"github.com/WilliamCesarSantos/movie-suggestion/internal/application/suggestion"
+	appusecase "github.com/WilliamCesarSantos/movie-suggestion/internal/application/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion/internal/domain/entity"
 )
 
-// Manual mock for UserRepository
 type mockUserRepository struct {
 	user *entity.User
 	err  error
@@ -22,17 +21,10 @@ func (m *mockUserRepository) FindByID(ctx context.Context, id string) (*entity.U
 	return m.user, m.err
 }
 func (m *mockUserRepository) UpdateProfile(ctx context.Context, user *entity.User) error { return nil }
-func (m *mockUserRepository) RecordWatched(ctx context.Context, userID, movieID string, rating float64) error {
-	return nil
-}
-func (m *mockUserRepository) RecordLiked(ctx context.Context, userID, movieID string) error {
-	return nil
-}
-func (m *mockUserRepository) RecordDisliked(ctx context.Context, userID, movieID string) error {
+func (m *mockUserRepository) RecordWatched(ctx context.Context, userID, movieID string, userRating float64, reaction string) error {
 	return nil
 }
 
-// Manual mock for SuggestionRepository
 type mockSuggestionRepository struct {
 	movies []*entity.Movie
 	err    error

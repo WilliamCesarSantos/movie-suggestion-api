@@ -70,7 +70,8 @@ func (r *movieRepository) Upsert(ctx context.Context, movie *entity.Movie) error
 
 	query := `
 MERGE (m:Movie {imdbId: $imdbId})
-SET m.id = $id, m.title = $title, m.year = $year, m.plot = $plot,
+ON CREATE SET m.id = $id, m.createdAt = datetime()
+SET m.title = $title, m.year = $year, m.plot = $plot,
     m.runtime = $runtime, m.poster = $poster, m.imdbRating = $imdbRating
 WITH m
 FOREACH (g IN $genres | MERGE (genre:Genre {name: g}) MERGE (m)-[:HAS_GENRE]->(genre))

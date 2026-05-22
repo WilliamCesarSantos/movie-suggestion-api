@@ -5,23 +5,22 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/lambda"
-	"github.com/go-chi/chi/v5"
+	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/auth"
 )
 
 type contextKey string
 
 const (
 	ContextKeyUserID contextKey = "userId"
-	ContextKeyRole   contextKey = "role"
+	ContextKeyRoles  contextKey = "roles"
 )
 
 type AuthMiddleware struct {
-	authClient *lambda.AuthClient
+	jwtService *auth.JWTService
 }
 
-func NewAuthMiddleware(authClient *lambda.AuthClient) *AuthMiddleware {
-	return &AuthMiddleware{authClient: authClient}
+func NewAuthMiddleware(jwtService *auth.JWTService) *AuthMiddleware {
+	return &AuthMiddleware{jwtService: jwtService}
 }
 
 func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
@@ -32,41 +31,13 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		resp, err := m.authClient.Validate(r.Context(), token)
-		if err != nil || !resp.Valid {
+		claims, err := m.jwtService.Validate(token)
+		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		ctx := context.WithValue(r.Context(), ContextKeyUserID, resp.UserID)
-		ctx = context.WithValue(ctx, ContextKeyRole, resp.Role)
+		ctx := context.WithValue(r.Context(), ContextKeyUserID, claims.Subject)
+		ctx = context.WithValue(ctx, ContextKeyRoles, claims.Roles)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func (m *AuthMiddleware) AuthorizeUserOrAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		role, _ := r.Context().Value(ContextKeyRole).(string)
-		if role == "admin" {
-			next.ServeHTTP(w, r)
-			return
-		}
-		tokenUserID, _ := r.Context().Value(ContextKeyUserID).(string)
-		pathUserID := chi.URLParam(r, "id")
-		if tokenUserID != pathUserID {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (m *AuthMiddleware) RequireAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		role, _ := r.Context().Value(ContextKeyRole).(string)
-		if role != "admin" {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(w, r)
 	})
 }

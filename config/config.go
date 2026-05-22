@@ -13,11 +13,11 @@ type Config struct {
 	Suggestion SuggestionConfig
 	SQS        SQSConfig
 	AWS        AWSConfig
-	Lambda     LambdaConfig
+	Postgres   PostgresConfig
+	Auth       AuthConfig
 	Otel       OtelConfig
 	Server     ServerConfig
 	Log        LogConfig
-	JWT        JWTConfig
 }
 
 type Neo4jConfig struct {
@@ -56,9 +56,14 @@ type AWSConfig struct {
 	Endpoint string
 }
 
-type LambdaConfig struct {
-	AuthFunctionName   string
-	ImportFunctionName string
+type PostgresConfig struct {
+	DSN string
+}
+
+type AuthConfig struct {
+	Pepper      string
+	Secret      string
+	ExpiryHours int
 }
 
 type OtelConfig struct {
@@ -73,10 +78,6 @@ type ServerConfig struct {
 
 type LogConfig struct {
 	Pretty bool
-}
-
-type JWTConfig struct {
-	Secret string
 }
 
 func Load() (*Config, error) {
@@ -105,8 +106,10 @@ func Load() (*Config, error) {
 	awsRegion := getEnv("AWS_REGION", "us-east-1")
 	awsEndpoint := getEnv("AWS_ENDPOINT", "")
 
-	authFunc := getEnv("LAMBDA_AUTH_FUNCTION_NAME", "auth-function")
-	importFunc := getEnv("LAMBDA_IMPORT_FUNCTION_NAME", "import-function")
+	postgresDSN := getEnv("POSTGRES_DSN", "postgres://postgres:password@localhost:5432/movie_suggestion?sslmode=disable")
+	argon2Pepper := getEnv("ARGON2_PEPPER", "movie-suggestion-123456")
+	jwtSecret := getEnv("JWT_SECRET", "dev-secret")
+	jwtExpiryHours, _ := strconv.Atoi(getEnv("JWT_EXPIRY_HOURS", "24"))
 
 	otelEndpoint := getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 	otelService := getEnv("OTEL_SERVICE_NAME", "movie-suggestion")
@@ -115,8 +118,6 @@ func Load() (*Config, error) {
 	metricsPort, _ := strconv.Atoi(getEnv("METRICS_PORT", "9090"))
 
 	logPretty := getEnv("LOG_PRETTY", "false") == "true"
-
-	jwtSecret := getEnv("JWT_SECRET", "dev-secret")
 
 	return &Config{
 		Neo4j: Neo4jConfig{
@@ -150,9 +151,13 @@ func Load() (*Config, error) {
 			Region:   awsRegion,
 			Endpoint: awsEndpoint,
 		},
-		Lambda: LambdaConfig{
-			AuthFunctionName:   authFunc,
-			ImportFunctionName: importFunc,
+		Postgres: PostgresConfig{
+			DSN: postgresDSN,
+		},
+		Auth: AuthConfig{
+			Pepper:      argon2Pepper,
+			Secret:      jwtSecret,
+			ExpiryHours: jwtExpiryHours,
 		},
 		Otel: OtelConfig{
 			Endpoint:    otelEndpoint,
@@ -164,9 +169,6 @@ func Load() (*Config, error) {
 		},
 		Log: LogConfig{
 			Pretty: logPretty,
-		},
-		JWT: JWTConfig{
-			Secret: jwtSecret,
 		},
 	}, nil
 }

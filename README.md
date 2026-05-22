@@ -4,7 +4,7 @@ A production-ready movie recommendation API built in Go, using clean architectur
 
 ## Overview
 
-The Movie Suggestion App provides personalized movie recommendations to users by automatically selecting the best algorithm based on their watch history. It integrates with OMDB for movie data, uses AWS Lambda for JWT auth and import triggering, and processes async import jobs via SQS.
+The Movie Suggestion App provides personalized movie recommendations to users by automatically selecting the best algorithm based on their watch history. It integrates with OMDB for movie data, stores auth users in PostgreSQL, handles JWT auth natively in Go, and processes async import jobs via SQS.
 
 ---
 
@@ -14,7 +14,7 @@ The project follows **Clean Architecture** with three layers:
 
 - **Domain** (`internal/domain/`) — Entities, repository interfaces, use case interfaces. Zero external dependencies.
 - **Application** (`internal/application/`) — Use case implementations, algorithm selection and dispatching logic.
-- **Infrastructure** (`internal/infrastructure/`) — Neo4j repositories, HTTP handlers/middleware/router, AWS clients (Lambda, SQS), OMDB client, observability (metrics + tracing).
+- **Infrastructure** (`internal/infrastructure/`) — Neo4j/PostgreSQL repositories, auth services, HTTP handlers/middleware/router, AWS SQS client, OMDB client, observability (metrics + tracing).
 
 ### System Architecture Diagram
 
@@ -27,37 +27,37 @@ The project follows **Clean Architecture** with three layers:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                          Go API (chi router)                        │
 │  ┌──────────────┐  ┌───────────────┐  ┌─────────────────────────┐  │
-│  │ Auth Lambda  │  │  Observability│  │  HTTP Handlers          │  │
-│  │ Middleware   │  │  (OTEL/Prom)  │  │  (User/Movie/Admin)     │  │
+│  │ JWT/RBAC     │  │  Observability│  │  HTTP Handlers          │  │
+│  │ Middleware   │  │  (OTEL/Prom)  │  │  (User/Movie/Auth)      │  │
 │  └──────┬───────┘  └───────────────┘  └────────────┬────────────┘  │
 │         │                                           │               │
 │  ┌──────▼───────────────────────────────────────────▼────────────┐  │
 │  │                    Application Use Cases                       │  │
-│  │  SuggestMovies | ManageUser | ImportMovies | ProcessImport     │  │
-│  └──────────────────────────────┬─────────────────────────────── ┘  │
+│  │ SuggestMovies | ManageUser | Login | ImportMovies | GetMovie   │  │
+│  └──────────────────────────────┬────────────────────────────────┘  │
 │                                 │                                    │
 │  ┌──────────────────────────────▼─────────────────────────────────┐ │
 │  │                  Algorithm Layer                               │ │
 │  │  Popular | ContentBased | Collaborative | Hybrid | Serendipity│ │
-│  └──────────────────────────────┬─────────────────────────────── ┘ │
+│  └──────────────────────────────┬────────────────────────────────┘ │
 └─────────────────────────────────┼───────────────────────────────────┘
                                   │
-        ┌─────────────────────────┼──────────────────────┐
-        │                         │                      │
-        ▼                         ▼                      ▼
- ┌─────────────┐          ┌──────────────┐      ┌──────────────┐
- │   Neo4j     │          │  AWS Lambda  │      │  AWS SQS     │
- │  (Graph DB) │          │  auth/import │      │  (import q)  │
- └─────────────┘          └──────────────┘      └──────┬───────┘
-                                                        │
-                                               ┌────────▼───────┐
-                                               │  SQS Consumer  │
-                                               │  (Go workers)  │
-                                               └────────┬───────┘
-                                                        │
-                                               ┌────────▼───────┐
-                                               │  OMDB API      │
-                                               └────────────────┘
+         ┌────────────────────────┼────────────────────────────┐
+         │                        │                            │
+         ▼                        ▼                            ▼
+ ┌─────────────┐         ┌──────────────┐              ┌──────────────┐
+ │   Neo4j     │         │ PostgreSQL   │              │  AWS SQS     │
+ │  (Graph DB) │         │  (auth data) │              │  (import q)  │
+ └─────────────┘         └──────────────┘              └──────┬───────┘
+                                                               │
+                                                      ┌────────▼───────┐
+                                                      │  SQS Consumer  │
+                                                      │  (Go workers)  │
+                                                      └────────┬───────┘
+                                                               │
+                                                      ┌────────▼───────┐
+                                                      │    OMDB API    │
+                                                      └────────────────┘
 ```
 
 ### Recommendation Algorithm Auto-Selection
@@ -141,14 +141,15 @@ go run ./cmd/api
 | `SQS_WORKER_COUNT` | `5` | Number of SQS consumer workers |
 | `AWS_REGION` | `us-east-1` | AWS region |
 | `AWS_ENDPOINT` | _(empty)_ | Custom AWS endpoint (for LocalStack) |
-| `LAMBDA_AUTH_FUNCTION_NAME` | `auth-function` | Auth Lambda function name |
-| `LAMBDA_IMPORT_FUNCTION_NAME` | `import-function` | Import Lambda function name |
+| `POSTGRES_DSN` | `postgres://postgres:password@localhost:5432/movie_suggestion?sslmode=disable` | PostgreSQL DSN for auth data |
+| `ARGON2_PEPPER` | `movie-suggestion-123456` | Pepper used before Argon2id hashing |
+| `JWT_SECRET` | `dev-secret` | JWT signing secret |
+| `JWT_EXPIRY_HOURS` | `24` | JWT expiration in hours |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | OpenTelemetry OTLP endpoint |
 | `OTEL_SERVICE_NAME` | `movie-suggestion` | Service name for traces |
 | `SERVER_PORT` | `8080` | HTTP API port |
 | `METRICS_PORT` | `9090` | Prometheus metrics port |
 | `LOG_PRETTY` | `false` | Enable pretty console logging |
-| `JWT_SECRET` | `dev-secret` | JWT signing secret |
 
 ---
 
@@ -157,14 +158,13 @@ go run ./cmd/api
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/v1/health` | None | Health check |
-| `POST` | `/api/v1/users` | None | Create a new user |
-| `GET` | `/api/v1/users/{id}` | Bearer (self or admin) | Get user details |
-| `POST` | `/api/v1/users/{id}/watched` | Bearer (self or admin) | Record a watched movie |
-| `POST` | `/api/v1/users/{id}/liked` | Bearer (self or admin) | Record a liked movie |
-| `POST` | `/api/v1/users/{id}/disliked` | Bearer (self or admin) | Record a disliked movie |
-| `GET` | `/api/v1/users/{id}/suggestions` | Bearer (self or admin) | Get movie suggestions |
-| `GET` | `/api/v1/movies/{id}` | Bearer | Get movie details |
-| `POST` | `/api/v1/admin/import/trigger` | Bearer (admin only) | Trigger movie import |
+| `POST` | `/api/v1/login` | None | Login and get a JWT |
+| `POST` | `/api/v1/users` | Bearer (`users:write`) | Create a new user |
+| `GET` | `/api/v1/users/{id}` | Bearer (`users:read` + owner or `*`) | Get user details |
+| `GET` | `/api/v1/users/{id}/suggestions` | Bearer (`suggestions:read` + owner or `*`) | Get movie suggestions |
+| `GET` | `/api/v1/movies/{id}` | Bearer (`movies:read`) | Get movie details |
+| `POST` | `/api/v1/movie/{id}/watched` | Bearer (`movie-watch:write`) | Record a watched movie for the authenticated user |
+| `POST` | `/api/v1/movie-import` | Bearer (`movies:write`) | Trigger movie import |
 | `GET` | `/metrics` | None (port 9090) | Prometheus metrics |
 
 ### Query Parameters for Suggestions
@@ -184,21 +184,21 @@ go run ./cmd/api
 curl http://localhost:8080/api/v1/health
 ```
 
+### Login
+
+```bash
+curl -X POST http://localhost:8080/api/v1/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "william_cesar_santos@hotmail.com", "password": "123456"}'
+```
+
 ### Create a User
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/users \
+  -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{"name": "Alice", "email": "alice@example.com"}'
-```
-
-### Get a Token (via Auth Lambda — example with LocalStack)
-
-```bash
-aws --endpoint-url=http://localhost:4566 lambda invoke \
-  --function-name auth-function \
-  --payload '{"action":"generate","userId":"<user-id>","email":"alice@example.com","role":"user"}' \
-  /dev/stdout
+  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","users:write","suggestions:read","movies:read","movie-watch:write"]}'
 ```
 
 ### Get User Details
@@ -211,28 +211,10 @@ curl http://localhost:8080/api/v1/users/<user-id> \
 ### Record a Watched Movie
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/users/<user-id>/watched \
+curl -X POST http://localhost:8080/api/v1/movie/<movie-id>/watched \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"movieId": "<movie-id>", "rating": 8.5}'
-```
-
-### Record a Liked Movie
-
-```bash
-curl -X POST http://localhost:8080/api/v1/users/<user-id>/liked \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"movieId": "<movie-id>", "algorithm": "POPULAR"}'
-```
-
-### Record a Disliked Movie
-
-```bash
-curl -X POST http://localhost:8080/api/v1/users/<user-id>/disliked \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"movieId": "<movie-id>"}'
+  -d '{"rating": 8.5, "reaction": "liked"}'
 ```
 
 ### Get Movie Suggestions
@@ -254,10 +236,10 @@ curl http://localhost:8080/api/v1/movies/<movie-id> \
   -H "Authorization: Bearer <token>"
 ```
 
-### Trigger Movie Import (Admin)
+### Trigger Movie Import
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/admin/import/trigger \
+curl -X POST http://localhost:8080/api/v1/movie-import \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"searchTerms": ["inception", "matrix", "interstellar"], "maxPages": 3}'
@@ -286,49 +268,43 @@ go test ./internal/application/usecase/...
 ```
 movie-suggestion/
 ├── cmd/
-│   └── api/
-│       └── main.go                    # Application entrypoint
+│   ├── api/
+│   │   └── main.go                    # Application entrypoint
+│   └── seed/
+│       └── main.go                    # Argon2id hash helper
 ├── config/
 │   └── config.go                      # Configuration loading from env vars
 ├── internal/
 │   ├── domain/
-│   │   ├── entity/                    # Domain entities (Movie, User, errors)
+│   │   ├── entity/                    # Domain entities (Movie, User, AuthUser, errors)
 │   │   ├── repository/                # Repository interfaces
 │   │   └── usecase/                   # Use case interfaces
 │   ├── application/
-│   │   ├── suggestion/                # Algorithm selector, dispatcher, placeholders
+│   │   ├── suggestion/                # Algorithm selector and dispatcher
 │   │   └── usecase/                   # Use case implementations
 │   └── infrastructure/
+│       ├── auth/                      # JWT and password services
 │       ├── http/
 │       │   ├── handler/               # HTTP handlers
-│       │   ├── middleware/            # Auth, observability middleware
+│       │   ├── middleware/            # Auth, RBAC, observability middleware
 │       │   └── router/                # Chi router setup
-│       ├── lambda/                    # AWS Lambda clients (auth, import)
 │       ├── neo4j/
 │       │   ├── cypher/                # Cypher query constants
 │       │   ├── movie_repository.go
 │       │   ├── user_repository.go
 │       │   └── suggestion_repository.go
+│       ├── postgres/                  # PostgreSQL auth repository
 │       ├── observability/             # Prometheus metrics, OTEL tracer
-│       ├── omdb/                      # OMDB HTTP client
-│       └── sqs/                       # SQS consumer
-├── auth-lambda/                       # Python JWT auth Lambda
-│   ├── handler.py
-│   ├── jwt_service.py
-│   ├── requirements.txt
-│   └── Dockerfile
-├── import-lambda/                     # Python import orchestration Lambda
-│   ├── handler.py
-│   ├── omdb_client.py
-│   ├── sqs_publisher.py
-│   ├── requirements.txt
-│   └── Dockerfile
-├── init/
-│   └── neo4j-init.cypher              # Neo4j constraints and indexes
+│       ├── omdb/                      # OMDB HTTP client and adapter
+│       └── sqs/                       # SQS consumer and publisher
+├── nginx/
+│   └── nginx.conf
 ├── scripts/
 │   ├── aws/                           # LocalStack initialization scripts
+│   ├── postgresql/                    # PostgreSQL bootstrap scripts
 │   ├── prometheus/                    # Prometheus configuration
-│   └── grafana/                       # Grafana provisioning
+│   ├── grafana/                       # Grafana provisioning
+│   └── demo.sh                        # End-to-end demo script
 ├── docker-compose.yml
 ├── Dockerfile
 ├── go.mod
