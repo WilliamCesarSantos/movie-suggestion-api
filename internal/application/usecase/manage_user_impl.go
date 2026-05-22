@@ -24,7 +24,9 @@ func (uc *manageUserUseCase) Create(ctx context.Context, user *entity.User) erro
 	if user.ID == "" {
 		user.ID = uuid.New().String()
 	}
-	user.CreatedAt = time.Now()
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = time.Now()
+	}
 	user.CurrentAlgorithm = entity.AlgorithmPopular
 	return uc.userRepo.Create(ctx, user)
 }
@@ -33,8 +35,8 @@ func (uc *manageUserUseCase) GetByID(ctx context.Context, id string) (*entity.Us
 	return uc.userRepo.FindByID(ctx, id)
 }
 
-func (uc *manageUserUseCase) RecordWatched(ctx context.Context, userID, movieID string, rating float64) (*entity.User, error) {
-	if err := uc.userRepo.RecordWatched(ctx, userID, movieID, rating); err != nil {
+func (uc *manageUserUseCase) RecordWatched(ctx context.Context, userID, movieID string, userRating float64, reaction string) (*entity.User, error) {
+	if err := uc.userRepo.RecordWatched(ctx, userID, movieID, userRating, reaction); err != nil {
 		return nil, err
 	}
 	user, err := uc.userRepo.FindByID(ctx, userID)
@@ -49,18 +51,4 @@ func (uc *manageUserUseCase) RecordWatched(ctx context.Context, userID, movieID 
 		}
 	}
 	return user, nil
-}
-
-func (uc *manageUserUseCase) RecordLiked(ctx context.Context, userID, movieID string, suggestionAlgorithmUsed entity.SuggestionAlgorithm) (*entity.User, error) {
-	if err := uc.userRepo.RecordLiked(ctx, userID, movieID); err != nil {
-		return nil, err
-	}
-	return uc.userRepo.FindByID(ctx, userID)
-}
-
-func (uc *manageUserUseCase) RecordDisliked(ctx context.Context, userID, movieID string) (*entity.User, error) {
-	if err := uc.userRepo.RecordDisliked(ctx, userID, movieID); err != nil {
-		return nil, err
-	}
-	return uc.userRepo.FindByID(ctx, userID)
 }

@@ -2,30 +2,36 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/internal/domain/usecase"
-	"github.com/WilliamCesarSantos/movie-suggestion/internal/infrastructure/lambda"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/internal/domain/usecase"
+	"github.com/rs/zerolog/log"
 )
 
 type importMoviesUseCase struct {
-	importClient *lambda.ImportClient
+	searcher  domainusecase.OmdbSearcher
+	publisher domainusecase.MovieImportPublisher
 }
 
-func NewImportMoviesUseCase(importClient *lambda.ImportClient) usecase.ImportMoviesUseCase {
-	return &importMoviesUseCase{importClient: importClient}
-}
-
-type importPayload struct {
-	SearchTerms []string `json:"searchTerms"`
-	MaxPages    int      `json:"maxPages"`
+func NewImportMoviesUseCase(searcher domainusecase.OmdbSearcher, publisher domainusecase.MovieImportPublisher) domainusecase.ImportMoviesUseCase {
+	return &importMoviesUseCase{searcher: searcher, publisher: publisher}
 }
 
 func (uc *importMoviesUseCase) Execute(ctx context.Context, searchTerms []string, maxPages int) error {
-	payload := importPayload{SearchTerms: searchTerms, MaxPages: maxPages}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	return uc.importClient.Invoke(ctx, data)
+	go func() {
+		for _, term := range searchTerms {
+			for page := 1; page <= maxPages; page++ {
+				results, err := uc.searcher.Search(context.Background(), term, page)
+				if err != nil {
+					log.Error().Err(err).Str("term", term).Int("page", page).Msg("OMDB search error")
+					continue
+				}
+				for _, r := range results {
+					if err := uc.publisher.Publish(context.Background(), r.ImdbID); err != nil {
+						log.Error().Err(err).Str("imdbId", r.ImdbID).Msg("failed to publish import message")
+					}
+				}
+			}
+		}
+	}()
+	return nil
 }

@@ -7,12 +7,12 @@ import (
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/internal/domain/usecase"
 )
 
-type AdminHandler struct {
+type ImportHandler struct {
 	importUC domainusecase.ImportMoviesUseCase
 }
 
-func NewAdminHandler(importUC domainusecase.ImportMoviesUseCase) *AdminHandler {
-	return &AdminHandler{importUC: importUC}
+func NewImportHandler(importUC domainusecase.ImportMoviesUseCase) *ImportHandler {
+	return &ImportHandler{importUC: importUC}
 }
 
 type triggerImportRequest struct {
@@ -20,7 +20,7 @@ type triggerImportRequest struct {
 	MaxPages    int      `json:"maxPages"`
 }
 
-func (h *AdminHandler) TriggerImport(w http.ResponseWriter, r *http.Request) {
+func (h *ImportHandler) TriggerImport(w http.ResponseWriter, r *http.Request) {
 	var req triggerImportRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -37,6 +37,7 @@ func (h *AdminHandler) TriggerImport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to trigger import", http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{"status": "import triggered"})
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "import triggered"})
 }

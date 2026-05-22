@@ -11,7 +11,8 @@ import (
 func NewRouter(
 	userHandler *handler.UserHandler,
 	movieHandler *handler.MovieHandler,
-	adminHandler *handler.AdminHandler,
+	importHandler *handler.ImportHandler,
+	authHandler *handler.AuthHandler,
 	healthHandler *handler.HealthHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	metrics *observability.Metrics,
@@ -23,30 +24,23 @@ func NewRouter(
 	r.Use(middleware.ObservabilityMiddleware(metrics))
 
 	r.Get("/api/v1/health", healthHandler.Health)
+	r.Post("/api/v1/login", authHandler.Login)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public: create user
-		r.Post("/users", userHandler.CreateUser)
-
-		// Authenticated routes
 		r.Group(func(r chi.Router) {
 			r.Use(authMiddleware.Authenticate)
 
+			r.With(middleware.RequireRole("users:write")).Post("/users", userHandler.CreateUser)
+
 			r.Route("/users/{id}", func(r chi.Router) {
-				r.Use(authMiddleware.AuthorizeUserOrAdmin)
-				r.Get("/", userHandler.GetUser)
-				r.Post("/watched", userHandler.RecordWatched)
-				r.Post("/liked", userHandler.RecordLiked)
-				r.Post("/disliked", userHandler.RecordDisliked)
-				r.Get("/suggestions", userHandler.GetSuggestions)
+				r.With(middleware.RequireRole("users:read"), middleware.RequireOwnerOrWildcard()).Get("/", userHandler.GetUser)
+				r.With(middleware.RequireRole("suggestions:read"), middleware.RequireOwnerOrWildcard()).Get("/suggestions", userHandler.GetSuggestions)
 			})
 
-			r.Get("/movies/{id}", movieHandler.GetMovie)
+			r.With(middleware.RequireRole("movies:read")).Get("/movies/{id}", movieHandler.GetMovie)
+			r.With(middleware.RequireRole("movie-watch:write")).Post("/movie/{id}/watched", movieHandler.RecordWatched)
 
-			r.Group(func(r chi.Router) {
-				r.Use(authMiddleware.RequireAdmin)
-				r.Post("/admin/import/trigger", adminHandler.TriggerImport)
-			})
+			r.With(middleware.RequireRole("movies:write")).Post("/movie-import", importHandler.TriggerImport)
 		})
 	})
 

@@ -11,19 +11,27 @@ services:
       - neo4j_data:/data
       - ./scripts/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
 
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: movie_suggestion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
   localstack:
     image: localstack/localstack:4.14
     environment:
-      SERVICES: sqs,lambda,ssm
+      SERVICES: sqs,ssm
       AWS_DEFAULT_REGION: us-east-1
-      DOCKER_HOST: unix:///var/run/docker.sock
     ports:
       - "4566:4566"
     volumes:
       - ./scripts/aws/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
-      - ./auth-lambda:/opt/auth-lambda
-      - ./import-lambda:/opt/import-lambda
-      - /var/run/docker.sock:/var/run/docker.sock
 
   prometheus:
     image: prom/prometheus:v3.3.1
@@ -52,6 +60,8 @@ services:
 
   api:
     build: .
+    deploy:
+      replicas: 3
     environment:
       NEO4J_URI: bolt://neo4j:7687
       NEO4J_USERNAME: neo4j
@@ -62,19 +72,29 @@ services:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       SQS_QUEUE_URL: http://localstack:4566/000000000000/movie-import
-      LAMBDA_AUTH_FUNCTION_NAME: auth-function
-      LAMBDA_IMPORT_FUNCTION_NAME: import-function
+      POSTGRES_DSN: postgres://postgres:password@postgres:5432/movie_suggestion?sslmode=disable
+      JWT_SECRET: dev-secret
+      JWT_EXPIRY_HOURS: "24"
+      ARGON2_PEPPER: movie-suggestion-123456
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       OTEL_SERVICE_NAME: movie-suggestion
       SERVER_PORT: "8080"
       METRICS_PORT: "9090"
-    ports:
-      - "8080:8080"
-      - "9090:9090"
     depends_on:
       - neo4j
       - localstack
       - jaeger
+      - postgres
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
 
 volumes:
   neo4j_data:
+  postgres_data:

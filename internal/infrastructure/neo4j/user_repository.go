@@ -68,50 +68,45 @@ func (r *userRepository) UpdateProfile(ctx context.Context, user *entity.User) e
 	return err
 }
 
-func (r *userRepository) RecordWatched(ctx context.Context, userID, movieID string, rating float64) error {
-	_, err := neo4j.ExecuteQuery(ctx, r.driver,
+func (r *userRepository) RecordWatched(ctx context.Context, userID, movieID string, userRating float64, reaction string) error {
+	existence, err := neo4j.ExecuteQuery(ctx, r.driver,
+		`OPTIONAL MATCH (u:User {id: $userId})
+         OPTIONAL MATCH (m:Movie {id: $movieId})
+         RETURN u IS NOT NULL AS userExists, m IS NOT NULL AS movieExists`,
+		map[string]any{
+			"userId":  userID,
+			"movieId": movieID,
+		},
+		neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase(r.database),
+	)
+	if err != nil {
+		return err
+	}
+	if len(existence.Records) == 0 {
+		return entity.ErrUserNotFound
+	}
+
+	userExists, _ := existence.Records[0].Get("userExists")
+	movieExists, _ := existence.Records[0].Get("movieExists")
+	if ok, _ := userExists.(bool); !ok {
+		return entity.ErrUserNotFound
+	}
+	if ok, _ := movieExists.(bool); !ok {
+		return entity.ErrMovieNotFound
+	}
+
+	_, err = neo4j.ExecuteQuery(ctx, r.driver,
 		`MATCH (u:User {id: $userId}), (m:Movie {id: $movieId})
          MERGE (u)-[w:WATCHED]->(m)
-         SET w.watchedAt = $watchedAt, w.rating = $rating
+         SET w.watchedAt = $watchedAt, w.userRating = $userRating, w.reaction = $reaction
          SET u.watchCount = u.watchCount + 1`,
 		map[string]any{
-			"userId":    userID,
-			"movieId":   movieID,
-			"watchedAt": time.Now().Format(time.RFC3339),
-			"rating":    rating,
-		},
-		neo4j.EagerResultTransformer,
-		neo4j.ExecuteQueryWithDatabase(r.database),
-	)
-	return err
-}
-
-func (r *userRepository) RecordLiked(ctx context.Context, userID, movieID string) error {
-	_, err := neo4j.ExecuteQuery(ctx, r.driver,
-		`MATCH (u:User {id: $userId}), (m:Movie {id: $movieId})
-         MERGE (u)-[:LIKED]->(m)
-         SET u.likeCount = u.likeCount + 1
-         WITH u, m
-         MATCH (m)-[:HAS_GENRE]->(g:Genre)
-         MERGE (u)-[:INTERESTED_IN]->(g)`,
-		map[string]any{
-			"userId":  userID,
-			"movieId": movieID,
-		},
-		neo4j.EagerResultTransformer,
-		neo4j.ExecuteQueryWithDatabase(r.database),
-	)
-	return err
-}
-
-func (r *userRepository) RecordDisliked(ctx context.Context, userID, movieID string) error {
-	_, err := neo4j.ExecuteQuery(ctx, r.driver,
-		`MATCH (u:User {id: $userId}), (m:Movie {id: $movieId})
-         MERGE (u)-[:DISLIKED]->(m)
-         SET u.dislikeCount = u.dislikeCount + 1`,
-		map[string]any{
-			"userId":  userID,
-			"movieId": movieID,
+			"userId":     userID,
+			"movieId":    movieID,
+			"watchedAt":  time.Now().Format(time.RFC3339),
+			"userRating": userRating,
+			"reaction":   reaction,
 		},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
