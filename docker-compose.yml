@@ -9,30 +9,31 @@ services:
       - "7687:7687"
     volumes:
       - neo4j_data:/data
-      - ./init/neo4j-init.cypher:/var/lib/neo4j/import/init.cypher
+      - ./scripts/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
 
   localstack:
-    image: localstack/localstack:3
+    image: localstack/localstack:4.14
     environment:
       SERVICES: sqs,lambda,ssm
       AWS_DEFAULT_REGION: us-east-1
-      LAMBDA_EXECUTOR: docker
       DOCKER_HOST: unix:///var/run/docker.sock
     ports:
       - "4566:4566"
     volumes:
       - ./scripts/aws/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
+      - ./auth-lambda:/opt/auth-lambda
+      - ./import-lambda:/opt/import-lambda
       - /var/run/docker.sock:/var/run/docker.sock
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.3.1
     ports:
       - "9091:9090"
     volumes:
       - ./scripts/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.0
     ports:
       - "3000:3000"
     volumes:
@@ -42,7 +43,7 @@ services:
       - prometheus
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/all-in-one:1.76.0
     ports:
       - "16686:16686"
       - "4317:4317"
