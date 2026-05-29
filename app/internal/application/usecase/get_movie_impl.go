@@ -1,0 +1,25 @@
+package usecase
+
+import (
+	"context"
+
+	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/usecase"
+)
+
+type getMovieUseCase struct {
+	movieRepo repository.MovieRepository
+}
+
+func NewGetMovieUseCase(movieRepo repository.MovieRepository) domainusecase.GetMovieUseCase {
+	return &getMovieUseCase{movieRepo: movieRepo}
+}
+
+func (uc *getMovieUseCase) GetByID(ctx context.Context, id string) (*entity.Movie, error) {
+	return uc.movieRepo.FindByID(ctx, id)
+}
+
+func (uc *getMovieUseCase) ListMovies(ctx context.Context, page, limit int) ([]*entity.Movie, int, error) {
+	return uc.movieRepo.FindAll(ctx, page, limit)
+}

@@ -1,0 +1,109 @@
+version: "3.9"
+services:
+  neo4j:
+    container_name: movie-suggestion-neo4j
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/password
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - ./neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
+
+  postgres:
+    container_name: movie-suggestion-postgres
+    image: postgres:16
+    environment:
+      POSTGRES_DB: movie_suggestion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  localstack:
+    container_name: movie-suggestion-localstack
+    image: localstack/localstack:4.14
+    environment:
+      SERVICES: sqs,ssm
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./localstack:/etc/localstack/init/ready.d
+
+  prometheus:
+    container_name: movie-suggestion-prometheus
+    image: prom/prometheus:v3.3.1
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    container_name: movie-suggestion-grafana
+    image: grafana/grafana:13.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+
+  jaeger:
+    container_name: movie-suggestion-jaeger
+    image: jaegertracing/all-in-one:1.76.0
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  movie-suggestion:
+    build:
+      context: ..
+      dockerfile: app/docker/Dockerfile
+    deploy:
+      replicas: 3
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: password
+      NEO4J_DATABASE: neo4j
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/movie-import
+      POSTGRES_DSN: postgres://postgres:password@postgres:5432/movie_suggestion?sslmode=disable
+      JWT_SECRET: dev-secret
+      JWT_EXPIRY_HOURS: "24"
+      ARGON2_PEPPER: movie-suggestion-123456
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      OTEL_SERVICE_NAME: movie-suggestion
+      SERVER_PORT: "8080"
+      METRICS_PORT: "9090"
+    depends_on:
+      - neo4j
+      - localstack
+      - jaeger
+      - postgres
+
+  nginx:
+    container_name: movie-suggestion-nginx
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - movie-suggestion
+
+volumes:
+  neo4j_data:
+  postgres_data:
