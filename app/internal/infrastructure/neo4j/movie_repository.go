@@ -21,7 +21,14 @@ func NewMovieRepository(driver neo4j.DriverWithContext, database string) reposit
 
 func (r *movieRepository) FindByID(ctx context.Context, id string) (*entity.Movie, error) {
 	result, err := neo4j.ExecuteQuery(ctx, r.driver,
-		"MATCH (m:Movie {id: $id}) RETURN m",
+		`MATCH (m:Movie {id: $id})
+		OPTIONAL MATCH (m)-[:HAS_GENRE]->(g:Genre)
+		OPTIONAL MATCH (m)-[:HAS_ACTOR]->(a:Actor)
+		OPTIONAL MATCH (m)-[:DIRECTED_BY]->(d:Director)
+		RETURN m,
+		       collect(DISTINCT g.name) AS genres,
+		       collect(DISTINCT a.name) AS actors,
+		       collect(DISTINCT d.name) AS directors`,
 		map[string]any{"id": id},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
@@ -32,7 +39,7 @@ func (r *movieRepository) FindByID(ctx context.Context, id string) (*entity.Movi
 	if len(result.Records) == 0 {
 		return nil, entity.ErrMovieNotFound
 	}
-	return recordToMovie(result.Records[0])
+	return recordToMovieFull(result.Records[0])
 }
 
 func (r *movieRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.Movie, int, error) {
@@ -101,11 +108,11 @@ func (r *movieRepository) Upsert(ctx context.Context, movie *entity.Movie) error
 	}
 	actors := make([]map[string]any, len(movie.Actors))
 	for i, a := range movie.Actors {
-		actors[i] = map[string]any{"name": a.Name, "imdbId": a.ImdbID}
+		actors[i] = map[string]any{"name": a.Name}
 	}
 	directors := make([]map[string]any, len(movie.Directors))
 	for i, d := range movie.Directors {
-		directors[i] = map[string]any{"name": d.Name, "imdbId": d.ImdbID}
+		directors[i] = map[string]any{"name": d.Name}
 	}
 
 	query := `
@@ -116,9 +123,9 @@ SET m.title = $title, m.year = $year, m.plot = $plot,
 WITH m
 FOREACH (g IN $genres | MERGE (genre:Genre {name: g}) MERGE (m)-[:HAS_GENRE]->(genre))
 WITH m
-FOREACH (a IN $actors | MERGE (actor:Actor {imdbId: a.imdbId}) SET actor.name = a.name MERGE (m)-[:HAS_ACTOR]->(actor))
+FOREACH (a IN $actors | MERGE (actor:Actor {name: a.name}) MERGE (m)-[:HAS_ACTOR]->(actor))
 WITH m
-FOREACH (d IN $directors | MERGE (dir:Director {imdbId: d.imdbId}) SET dir.name = d.name MERGE (m)-[:DIRECTED_BY]->(dir))
+FOREACH (d IN $directors | MERGE (dir:Director {name: d.name}) MERGE (m)-[:DIRECTED_BY]->(dir))
 `
 	_, err := neo4j.ExecuteQuery(ctx, r.driver, query,
 		map[string]any{
@@ -169,6 +176,38 @@ func recordToMovie(record *neo4j.Record) (*entity.Movie, error) {
 	}
 	if v, ok := node.Props["imdbId"]; ok {
 		m.ImdbID, _ = v.(string)
+	}
+	return m, nil
+}
+
+func recordToMovieFull(record *neo4j.Record) (*entity.Movie, error) {
+	m, err := recordToMovie(record)
+	if err != nil {
+		return nil, err
+	}
+	if rawGenres, ok := record.Values[1].([]any); ok {
+		m.Genres = make([]entity.Genre, 0, len(rawGenres))
+		for _, v := range rawGenres {
+			if name, ok := v.(string); ok && name != "" {
+				m.Genres = append(m.Genres, entity.Genre{Name: name})
+			}
+		}
+	}
+	if rawActors, ok := record.Values[2].([]any); ok {
+		m.Actors = make([]entity.Actor, 0, len(rawActors))
+		for _, v := range rawActors {
+			if name, ok := v.(string); ok && name != "" {
+				m.Actors = append(m.Actors, entity.Actor{Name: name})
+			}
+		}
+	}
+	if rawDirs, ok := record.Values[3].([]any); ok {
+		m.Directors = make([]entity.Director, 0, len(rawDirs))
+		for _, v := range rawDirs {
+			if name, ok := v.(string); ok && name != "" {
+				m.Directors = append(m.Directors, entity.Director{Name: name})
+			}
+		}
 	}
 	return m, nil
 }

@@ -37,11 +37,19 @@ func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(movie)
 }
 
+type movieSummary struct {
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	Year       string  `json:"year"`
+	Poster     string  `json:"poster"`
+	ImdbRating float64 `json:"imdbRating"`
+}
+
 type listMoviesResponse struct {
-	Data  []*entity.Movie `json:"data"`
-	Page  int             `json:"page"`
-	Limit int             `json:"limit"`
-	Total int             `json:"total"`
+	Data  []movieSummary `json:"data"`
+	Page  int            `json:"page"`
+	Limit int            `json:"limit"`
+	Total int            `json:"total"`
 }
 
 func (h *MovieHandler) ListMovies(w http.ResponseWriter, r *http.Request) {
@@ -64,12 +72,19 @@ func (h *MovieHandler) ListMovies(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	if movies == nil {
-		movies = []*entity.Movie{}
+	summaries := make([]movieSummary, len(movies))
+	for i, m := range movies {
+		summaries[i] = movieSummary{
+			ID:         m.ID,
+			Title:      m.Title,
+			Year:       m.Year,
+			Poster:     m.Poster,
+			ImdbRating: m.ImdbRating,
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(listMoviesResponse{
-		Data:  movies,
+		Data:  summaries,
 		Page:  page,
 		Limit: limit,
 		Total: total,

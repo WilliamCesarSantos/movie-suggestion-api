@@ -28,7 +28,7 @@ sep "3. Create user Alice"
 ALICE_RESP=$(curl -sf -X POST "${BASE_URL}/api/v1/users" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","users:write","suggestions:read","movies:read","movie-watch:write"]}')
+  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","suggestions:read","movies:read","movies-watch:write"]}')
 ALICE_ID=$(echo "$ALICE_RESP" | jq -r '.id')
 echo "Alice ID: ${ALICE_ID}"
 
@@ -43,63 +43,91 @@ sep "5. Trigger movie import"
 curl -sf -X POST "${BASE_URL}/api/v1/movie-import" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" \
   -H "Content-Type: application/json" \
-  -d '{"searchTerms":["inception","matrix"],"maxPages":1}'
+  -d '{"searchTerms":["inception", "matrix", "interstellar", "tropa", "compadecida", "chefão", "pulp fiction"],"maxPages":5}'
 echo "Import triggered"
 
 sep "6. Waiting 15s for SQS consumer..."
 sleep 15
 
-sep "7. Get Alice (as Alice)"
+sep "7. List movies and record watched for Alice"
+MOVIE_LIST=$(curl -sf "${BASE_URL}/api/v1/movies?limit=20" \
+  -H "Authorization: Bearer ${TOKEN_ALICE}")
+MOVIE_IDS=($(echo "$MOVIE_LIST" | jq -r '.data[].id' | head -10))
+
+REACTIONS=("liked" "liked" "liked" "liked" "liked" "liked" "disliked" "neutral" "liked" "disliked")
+RATINGS=("8.5" "9.0" "7.5" "8.0" "6.5" "9.5" "4.0" "6.0" "8.8" "3.5")
+
+if [ ${#MOVIE_IDS[@]} -eq 0 ]; then
+  echo "No movies imported yet, skipping watch registrations"
+else
+  echo "Registering ${#MOVIE_IDS[@]} watched movies for Alice..."
+  for i in "${!MOVIE_IDS[@]}"; do
+    MID="${MOVIE_IDS[$i]}"
+    REACTION="${REACTIONS[$i]}"
+    RATING="${RATINGS[$i]}"
+    curl -sf -X POST "${BASE_URL}/api/v1/movies/${MID}/watched" \
+      -H "Authorization: Bearer ${TOKEN_ALICE}" \
+      -H "Content-Type: application/json" \
+      -d "{\"rating\":${RATING},\"reaction\":\"${REACTION}\"}" > /dev/null
+    echo "  ✓ Movie ${MID} → ${REACTION} (${RATING})"
+  done
+fi
+
+sep "8. Get Alice (as Alice)"
 curl -sf "${BASE_URL}/api/v1/users/${ALICE_ID}" \
   -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 
-sep "8. Get Alice (as Admin)"
+sep "9. Get Alice (as Admin)"
 curl -sf "${BASE_URL}/api/v1/users/${ALICE_ID}" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" | jq .
 
-sep "9. Finding a movie..."
-MOVIE_SUGGESTIONS=$(curl -sf "${BASE_URL}/api/v1/users/${ALICE_ID}/suggestions" \
+sep "10. Get suggestions for Alice (auto-selected algorithm)"
+curl -sf "${BASE_URL}/api/v1/suggestions" \
+  -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
+
+sep "11. Finding a movie for further steps..."
+MOVIE_SUGGESTIONS=$(curl -sf "${BASE_URL}/api/v1/suggestions" \
   -H "Authorization: Bearer ${TOKEN_ALICE}")
 MOVIE_ID=$(echo "$MOVIE_SUGGESTIONS" | jq -r '.[0].id // empty')
 
 if [ -z "$MOVIE_ID" ]; then
   echo "No movies found yet, skipping watch steps"
 else
-  sep "10. Record watched movie (liked)"
-  curl -sf -X POST "${BASE_URL}/api/v1/movie/${MOVIE_ID}/watched" \
+  sep "12. Record one more watched movie (liked)"
+  curl -sf -X POST "${BASE_URL}/api/v1/movies/${MOVIE_ID}/watched" \
     -H "Authorization: Bearer ${TOKEN_ALICE}" \
     -H "Content-Type: application/json" \
     -d '{"rating":8.5,"reaction":"liked"}' | jq .
 
-  sep "11. Get suggestions for Alice"
-  curl -sf "${BASE_URL}/api/v1/users/${ALICE_ID}/suggestions" \
+  sep "13. Get suggestions for Alice"
+  curl -sf "${BASE_URL}/api/v1/suggestions" \
     -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 
-  sep "12. Get suggestions (SERENDIPITY)"
-  curl -sf "${BASE_URL}/api/v1/users/${ALICE_ID}/suggestions?algorithm=SERENDIPITY" \
+  sep "14. Get suggestions (SERENDIPITY)"
+  curl -sf "${BASE_URL}/api/v1/suggestions?algorithm=SERENDIPITY" \
     -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 
-  sep "13. Get movie details"
+  sep "15. Get movie details"
   curl -sf "${BASE_URL}/api/v1/movies/${MOVIE_ID}" \
     -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 fi
 
-sep "14. Invalid token (expect 401)"
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${BASE_URL}/api/v1/movie/some-id/watched" \
+sep "16. Invalid token (expect 401)"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${BASE_URL}/api/v1/movies/some-id/watched" \
   -H "Authorization: Bearer invalid-token" \
   -H "Content-Type: application/json" \
   -d '{"rating":5.0}')
 echo "Status: ${STATUS}"
 [ "$STATUS" = "401" ] && echo "✓ Got 401 as expected" || echo "✗ Expected 401, got ${STATUS}"
 
-sep "15. Create user without auth (expect 401)"
+sep "17. Create user without auth (expect 401)"
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${BASE_URL}/api/v1/users" \
   -H "Content-Type: application/json" \
   -d '{"name":"Bob","email":"bob@example.com","password":"pass","roles":["users:read"]}')
 echo "Status: ${STATUS}"
 [ "$STATUS" = "401" ] && echo "✓ Got 401 as expected" || echo "✗ Expected 401, got ${STATUS}"
 
-sep "16. Test 403: Create user with token lacking users:write"
+sep "18. Test 403: Create user with token lacking users:write"
 LIMITED_RESP=$(curl -sf -X POST "${BASE_URL}/api/v1/users" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" \
   -H "Content-Type: application/json" \
@@ -115,7 +143,7 @@ STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${BASE_URL}/api/v1/user
 echo "Status: ${STATUS}"
 [ "$STATUS" = "403" ] && echo "✓ Got 403 as expected" || echo "✗ Expected 403, got ${STATUS}"
 
-sep "17. Final health check"
+sep "19. Final health check"
 curl -sf "${BASE_URL}/api/v1/health" | jq .
 
 echo

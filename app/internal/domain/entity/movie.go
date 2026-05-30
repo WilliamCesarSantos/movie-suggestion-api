@@ -2,12 +2,10 @@ package entity
 
 type Genre struct{ Name string }
 type Actor struct {
-	Name   string
-	ImdbID string
+	Name string
 }
 type Director struct {
-	Name   string
-	ImdbID string
+	Name string
 }
 
 type Movie struct {

@@ -32,15 +32,13 @@ func NewRouter(
 
 			r.With(middleware.RequireRole("users:write")).Post("/users", userHandler.CreateUser)
 
-			r.Route("/users/{id}", func(r chi.Router) {
-				r.With(middleware.RequireRole("users:read"), middleware.RequireOwnerOrWildcard()).Get("/", userHandler.GetUser)
-				r.With(middleware.RequireRole("suggestions:read"), middleware.RequireOwnerOrWildcard()).Get("/suggestions", userHandler.GetSuggestions)
-			})
+			r.With(middleware.RequireRole("users:read"), middleware.RequireOwnerOrWildcard()).Get("/users/{id}", userHandler.GetUser)
+
+			r.With(middleware.RequireRole("suggestions:read")).Get("/suggestions", userHandler.GetSuggestions)
 
 			r.With(middleware.RequireRole("movies:read")).Get("/movies", movieHandler.ListMovies)
-			r.With(middleware.RequireRole("movies:read")).Get("/movies", movieHandler.ListMovies)
 			r.With(middleware.RequireRole("movies:read")).Get("/movies/{id}", movieHandler.GetMovie)
-			r.With(middleware.RequireRole("movie-watch:write")).Post("/movie/{id}/watched", movieHandler.RecordWatched)
+			r.With(middleware.RequireRole("movies-watch:write")).Post("/movies/{id}/watched", movieHandler.RecordWatched)
 
 			r.With(middleware.RequireRole("movies:write")).Post("/movie-import", importHandler.TriggerImport)
 		})

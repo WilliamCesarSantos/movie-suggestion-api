@@ -161,9 +161,10 @@ go run ./cmd/api
 | `POST` | `/api/v1/login` | None | Login and get a JWT |
 | `POST` | `/api/v1/users` | Bearer (`users:write`) | Create a new user |
 | `GET` | `/api/v1/users/{id}` | Bearer (`users:read` + owner or `*`) | Get user details |
-| `GET` | `/api/v1/users/{id}/suggestions` | Bearer (`suggestions:read` + owner or `*`) | Get movie suggestions |
-| `GET` | `/api/v1/movies/{id}` | Bearer (`movies:read`) | Get movie details |
-| `POST` | `/api/v1/movie/{id}/watched` | Bearer (`movie-watch:write`) | Record a watched movie for the authenticated user |
+| `GET` | `/api/v1/suggestions` | Bearer (`suggestions:read`) | Get movie suggestions |
+| `GET` | `/api/v1/movies` | Bearer (`movies:read`) | List movies (summary fields only) |
+| `GET` | `/api/v1/movies/{id}` | Bearer (`movies:read`) | Get full movie details |
+| `POST` | `/api/v1/movies/{id}/watched` | Bearer (`movies-watch:write`) | Record a watched movie for the authenticated user |
 | `POST` | `/api/v1/movie-import` | Bearer (`movies:write`) | Trigger movie import |
 | `GET` | `/metrics` | None (port 9090) | Prometheus metrics |
 
@@ -173,6 +174,8 @@ go run ./cmd/api
 |-----------|------|-------------|
 | `limit` | int | Number of suggestions (default: 10, max: 50) |
 | `algorithm` | string | Override algorithm: `POPULAR`, `CONTENT_BASED`, `COLLABORATIVE`, `HYBRID`, `SERENDIPITY` |
+
+> User ID is extracted automatically from the Bearer token — no path parameter required.
 
 ---
 
@@ -211,7 +214,7 @@ curl http://localhost:8080/api/v1/users/<user-id> \
 ### Record a Watched Movie
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/movie/<movie-id>/watched \
+curl -X POST http://localhost:8080/api/v1/movies/<movie-id>/watched \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"rating": 8.5, "reaction": "liked"}'
@@ -221,11 +224,11 @@ curl -X POST http://localhost:8080/api/v1/movie/<movie-id>/watched \
 
 ```bash
 # Auto-selected algorithm
-curl "http://localhost:8080/api/v1/users/<user-id>/suggestions?limit=10" \
+curl "http://localhost:8080/api/v1/suggestions?limit=10" \
   -H "Authorization: Bearer <token>"
 
 # Override algorithm
-curl "http://localhost:8080/api/v1/users/<user-id>/suggestions?limit=5&algorithm=SERENDIPITY" \
+curl "http://localhost:8080/api/v1/suggestions?limit=5&algorithm=SERENDIPITY" \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -236,13 +239,17 @@ curl http://localhost:8080/api/v1/movies/<movie-id> \
   -H "Authorization: Bearer <token>"
 ```
 
+> **`GET /api/v1/movies`** returns a paginated list with summary fields only: `id`, `title`, `year`, `poster`, `imdbRating`.
+>
+> **`GET /api/v1/movies/{id}`** returns the full movie object, including all available fields: `id`, `title`, `year`, `plot`, `runtime`, `poster`, `imdbRating`, `imdbId`, `genres`, `actors`, `directors`.
+
 ### Trigger Movie Import
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/movie-import \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{"searchTerms": ["inception", "matrix", "interstellar"], "maxPages": 3}'
+  -d '{"searchTerms": ["inception", "matrix", "interstellar", "tropa", "compadecida", "chefão" "pulp fiction"], "maxPages": 3}'
 ```
 
 ---

@@ -100,7 +100,10 @@ func (r *userRepository) RecordWatched(ctx context.Context, userID, movieID stri
 		`MATCH (u:User {id: $userId}), (m:Movie {id: $movieId})
          MERGE (u)-[w:WATCHED]->(m)
          SET w.watchedAt = $watchedAt, w.userRating = $userRating, w.reaction = $reaction
-         SET u.watchCount = u.watchCount + 1`,
+         SET u.watchCount = u.watchCount + 1
+         FOREACH (_ IN CASE WHEN $reaction = 'liked' THEN [1] ELSE [] END |
+           MERGE (u)-[:LIKED]->(m)
+         )`,
 		map[string]any{
 			"userId":     userID,
 			"movieId":    movieID,

@@ -1,0 +1,695 @@
+openapi: 3.0.3
+info:
+  title: Movie Suggestion API
+  description: >
+    Personalized movie recommendation API built in Go using clean architecture.
+    Integrates with OMDB for movie data, Neo4j for graph-based recommendations,
+    PostgreSQL for authentication, and AWS SQS for async movie imports.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health check
+  - name: Auth
+    description: Authentication
+  - name: Users
+    description: User management
+  - name: Movies
+    description: Movie catalog
+  - name: Suggestions
+    description: Personalized movie recommendations
+  - name: Import
+    description: Async movie import via OMDB
+
+security: []
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns the health status of the API and its dependencies.
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is healthy or degraded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticates a user and returns a signed JWT token.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/users:
+    post:
+      tags: [Users]
+      summary: Create user
+      description: Creates a new user. Requires `users:write` role.
+      operationId: createUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Email already exists
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: email already exists
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user
+      description: Returns the details of a user. Requires `users:read` role and ownership or wildcard (`*`).
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "200":
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/suggestions:
+    get:
+      tags: [Suggestions]
+      summary: Get movie suggestions
+      description: >
+        Returns personalized movie recommendations for the authenticated user.
+        The user ID is extracted from the Bearer token — no path parameter required.
+        The algorithm is auto-selected based on the user's watch history
+        or can be overridden via the `algorithm` query parameter.
+        Requires `suggestions:read` role.
+
+        **Auto-selection rules:**
+
+        | Watch count | Algorithm |
+        |-------------|-----------|
+        | < 5 | POPULAR |
+        | 5 – 19 | CONTENT_BASED |
+        | ≥ 20 | COLLABORATIVE |
+      operationId: getSuggestions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Number of suggestions to return (default 10, max 50).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - name: algorithm
+          in: query
+          description: Override the auto-selected recommendation algorithm.
+          schema:
+            $ref: "#/components/schemas/SuggestionAlgorithm"
+      responses:
+        "200":
+          description: List of suggested movies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MovieSummary"
+        "400":
+          description: Unknown algorithm
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: algorithm not found
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/movies:
+    get:
+      tags: [Movies]
+      summary: List movies
+      description: >
+        Returns a paginated list of movies with summary fields only
+        (`id`, `title`, `year`, `poster`, `imdbRating`).
+        Requires `movies:read` role.
+      operationId: listMovies
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Items per page (max 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated movie list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListMoviesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/movies/{id}:
+    get:
+      tags: [Movies]
+      summary: Get movie details
+      description: >
+        Returns the full details of a movie, including genres, actors, directors and plot.
+        Requires `movies:read` role.
+      operationId: getMovie
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MovieID"
+      responses:
+        "200":
+          description: Full movie details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Movie"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/movies/{id}/watched:
+    post:
+      tags: [Movies]
+      summary: Record watched movie
+      description: Records that the authenticated user watched a movie, with a rating and reaction. Requires `movies-watch:write` role.
+      operationId: recordWatched
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/MovieID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordWatchedRequest"
+      responses:
+        "200":
+          description: Watch recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WatchedResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /api/v1/movie-import:
+    post:
+      tags: [Import]
+      summary: Trigger movie import
+      description: >
+        Triggers an async import of movies from OMDB for each search term.
+        For each term, up to `maxPages` pages (10 results/page) are fetched
+        and each movie is enqueued in SQS for processing.
+        Requires `movies:write` role.
+      operationId: triggerImport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerImportRequest"
+      responses:
+        "202":
+          description: Import triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: import triggered
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserID:
+      name: id
+      in: path
+      required: true
+      description: User UUID
+      schema:
+        type: string
+        format: uuid
+        example: 90b4fd08-ee46-4d54-a7c0-1bab4857cec3
+
+    MovieID:
+      name: id
+      in: path
+      required: true
+      description: Movie UUID
+      schema:
+        type: string
+        format: uuid
+        example: 4e5ebac2-d48d-4fc6-9319-dd52cf3be8b6
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: invalid request body
+
+    Unauthorized:
+      description: Missing or invalid JWT token
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: unauthorized
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: forbidden
+
+    NotFound:
+      description: Resource not found
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: not found
+
+    InternalError:
+      description: Internal server error
+      content:
+        text/plain:
+          schema:
+            type: string
+            example: internal server error
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded]
+          example: ok
+        neo4j:
+          type: string
+          enum: [ok, unavailable]
+          example: ok
+        time:
+          type: string
+          format: date-time
+          example: "2026-05-30T12:00:00Z"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: william_cesar_santos@hotmail.com
+        password:
+          type: string
+          format: password
+          example: "123456"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Signed JWT token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        email:
+          type: string
+          format: email
+          example: william_cesar_santos@hotmail.com
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["*"]
+        expiresAt:
+          type: string
+          format: date-time
+          example: "2026-05-31T12:00:00Z"
+
+    CreateUserRequest:
+      type: object
+      required: [name, email, password, roles]
+      properties:
+        name:
+          type: string
+          example: Alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        password:
+          type: string
+          format: password
+          example: s3cr3t
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["users:read", "users:write", "suggestions:read", "movies:read", "movie-watch:write"]
+
+    CreateUserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 90b4fd08-ee46-4d54-a7c0-1bab4857cec3
+        name:
+          type: string
+          example: Alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["users:read", "movies:read"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-30T12:00:00Z"
+
+    User:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+          example: 90b4fd08-ee46-4d54-a7c0-1bab4857cec3
+        Name:
+          type: string
+          example: William
+        Email:
+          type: string
+          format: email
+          example: william_cesar_santos@hotmail.com
+        CreatedAt:
+          type: string
+          format: date-time
+          example: "2026-05-30T12:00:00Z"
+        CurrentAlgorithm:
+          $ref: "#/components/schemas/SuggestionAlgorithm"
+        WatchCount:
+          type: integer
+          example: 12
+        LikeCount:
+          type: integer
+          example: 8
+        DislikeCount:
+          type: integer
+          example: 2
+
+    Genre:
+      type: object
+      properties:
+        Name:
+          type: string
+          example: Action
+
+    Actor:
+      type: object
+      properties:
+        Name:
+          type: string
+          example: Keanu Reeves
+
+    Director:
+      type: object
+      properties:
+        Name:
+          type: string
+          example: Lana Wachowski
+
+    Movie:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+          example: 4e5ebac2-d48d-4fc6-9319-dd52cf3be8b6
+        Title:
+          type: string
+          example: The Matrix
+        Year:
+          type: string
+          example: "1999"
+        Plot:
+          type: string
+          example: A computer hacker learns from mysterious rebels about the true nature of his reality.
+        Runtime:
+          type: string
+          example: 136 min
+        Poster:
+          type: string
+          format: uri
+          example: https://m.media-amazon.com/images/M/...
+        ImdbRating:
+          type: number
+          format: float
+          example: 8.7
+        ImdbID:
+          type: string
+          example: tt0133093
+        Genres:
+          type: array
+          items:
+            $ref: "#/components/schemas/Genre"
+        Actors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Actor"
+        Directors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Director"
+
+    MovieSummary:
+      type: object
+      description: Reduced movie representation returned in list endpoints.
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 4e5ebac2-d48d-4fc6-9319-dd52cf3be8b6
+        title:
+          type: string
+          example: The Matrix
+        year:
+          type: string
+          example: "1999"
+        poster:
+          type: string
+          format: uri
+          example: https://m.media-amazon.com/images/M/...
+        imdbRating:
+          type: number
+          format: float
+          example: 8.7
+
+    ListMoviesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MovieSummary"
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 142
+
+    RecordWatchedRequest:
+      type: object
+      required: [rating, reaction]
+      properties:
+        rating:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          example: 8.5
+        reaction:
+          type: string
+          enum: [liked, disliked, neutral]
+          example: liked
+
+    WatchedResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          example: 90b4fd08-ee46-4d54-a7c0-1bab4857cec3
+        movieId:
+          type: string
+          format: uuid
+          example: 4e5ebac2-d48d-4fc6-9319-dd52cf3be8b6
+        rating:
+          type: number
+          format: float
+          example: 8.5
+        reaction:
+          type: string
+          example: liked
+        watchedAt:
+          type: string
+          format: date-time
+          example: "2026-05-30T14:30:00Z"
+
+    TriggerImportRequest:
+      type: object
+      required: [searchTerms]
+      properties:
+        searchTerms:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          example: ["inception", "matrix", "interstellar"]
+        maxPages:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Number of OMDB result pages to fetch per search term (10 movies/page).
+          example: 3
+
+    SuggestionAlgorithm:
+      type: string
+      enum:
+        - POPULAR
+        - CONTENT_BASED
+        - COLLABORATIVE
+        - HYBRID
+        - SERENDIPITY
+      example: CONTENT_BASED

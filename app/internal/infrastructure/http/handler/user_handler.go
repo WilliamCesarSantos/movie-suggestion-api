@@ -11,6 +11,7 @@ import (
 	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/auth"
+	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/http/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
@@ -132,7 +133,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
+	id, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 
 	limitStr := r.URL.Query().Get("limit")
 	limit := 0
@@ -159,6 +160,24 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	type suggestionItem struct {
+		ID         string  `json:"id"`
+		Title      string  `json:"title"`
+		Year       string  `json:"year"`
+		Poster     string  `json:"poster"`
+		ImdbRating float64 `json:"imdbRating"`
+	}
+	result := make([]suggestionItem, len(movies))
+	for i, m := range movies {
+		result[i] = suggestionItem{
+			ID:         m.ID,
+			Title:      m.Title,
+			Year:       m.Year,
+			Poster:     m.Poster,
+			ImdbRating: m.ImdbRating,
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(movies)
+	_ = json.NewEncoder(w).Encode(result)
 }
