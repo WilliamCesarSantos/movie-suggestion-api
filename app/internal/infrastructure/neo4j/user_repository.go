@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 

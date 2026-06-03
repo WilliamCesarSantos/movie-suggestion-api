@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	appusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/application/usecase"
+	appusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/usecase"
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/rs/zerolog"

@@ -1,9 +1,9 @@
 package router
 
 import (
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/http/handler"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/http/middleware"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/observability"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/handler"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/observability"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )

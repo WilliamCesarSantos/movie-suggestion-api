@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/config"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/application/suggestion"
-	appusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/application/usecase"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/config"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
+	appusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/usecase"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 )
 
 type mockUserRepository struct {

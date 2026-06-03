@@ -10,11 +10,11 @@ awslocal sqs create-queue \
 echo "SQS queue 'movie-import' created"
 
 awslocal ssm put-parameter \
-  --name /movie-suggestion/jwt-secret \
+  --name /movie-suggestion-api/jwt-secret \
   --value "dev-secret" \
   --type SecureString \
   --overwrite
 
-echo "SSM parameter '/movie-suggestion/jwt-secret' created"
+echo "SSM parameter '/movie-suggestion-api/jwt-secret' created"
 
 echo "LocalStack initialization complete"

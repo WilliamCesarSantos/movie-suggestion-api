@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/observability"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/observability"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"

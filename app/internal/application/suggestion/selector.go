@@ -1,6 +1,6 @@
 package suggestion
 
-import "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+import "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 
 type AlgorithmSelector struct {
 	contentPreferenceThreshold float64

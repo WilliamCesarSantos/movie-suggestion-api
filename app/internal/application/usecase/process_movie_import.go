@@ -3,9 +3,9 @@ package usecase
 import (
 	"context"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/observability"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/omdb"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/observability"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/omdb"
 )
 
 type ProcessMovieImportUseCase interface {

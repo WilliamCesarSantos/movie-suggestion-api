@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 )
 
 type MovieRepository interface {

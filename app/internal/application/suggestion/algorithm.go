@@ -3,9 +3,9 @@ package suggestion
 import (
 	"context"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/config"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/config"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 )
 
 type AlgorithmDispatcher struct {

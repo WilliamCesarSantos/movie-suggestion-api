@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 )
 
 type SearchResult struct {

@@ -3,11 +3,11 @@ package usecase
 import (
 	"context"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/config"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/application/suggestion"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
-	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/usecase"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/config"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 )
 
 type suggestMoviesUseCase struct {

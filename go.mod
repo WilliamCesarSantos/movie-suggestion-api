@@ -1,4 +1,4 @@
-module github.com/WilliamCesarSantos/movie-suggestion
+module github.com/WilliamCesarSantos/movie-suggestion-api
 
 go 1.25.0
 

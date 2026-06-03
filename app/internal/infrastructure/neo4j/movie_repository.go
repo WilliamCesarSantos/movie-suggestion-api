@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )

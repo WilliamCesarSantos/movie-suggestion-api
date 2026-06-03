@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/usecase"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 )
 
 type ImportHandler struct {

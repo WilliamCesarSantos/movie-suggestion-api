@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/usecase"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/http/middleware"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
 	"github.com/go-chi/chi/v5"
 )
 

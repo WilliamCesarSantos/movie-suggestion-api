@@ -3,8 +3,8 @@ package suggestion_test
 import (
 	"testing"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/application/suggestion"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 )
 
 func TestAlgorithmSelector_Rules(t *testing.T) {

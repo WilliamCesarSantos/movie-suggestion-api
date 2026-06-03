@@ -4,7 +4,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 )
 
 type Config struct {

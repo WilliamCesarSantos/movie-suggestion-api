@@ -3,7 +3,7 @@ package observability
 import (
 	"context"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/config"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/config"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"

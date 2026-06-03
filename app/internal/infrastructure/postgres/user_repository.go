@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/repository"
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/postgres/model"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/postgres/model"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
 )

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/entity"
-	domainusecase "github.com/WilliamCesarSantos/movie-suggestion/app/internal/domain/usecase"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 )
 
 type AuthHandler struct {

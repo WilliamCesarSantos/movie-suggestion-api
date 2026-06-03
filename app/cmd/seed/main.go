@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/WilliamCesarSantos/movie-suggestion/app/internal/infrastructure/auth"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
 )
 
 func main() {
