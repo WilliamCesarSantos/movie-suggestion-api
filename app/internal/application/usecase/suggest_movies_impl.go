@@ -8,6 +8,7 @@ import (
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
+	"github.com/rs/zerolog/log"
 )
 
 type suggestMoviesUseCase struct {
@@ -37,5 +38,18 @@ func (uc *suggestMoviesUseCase) Execute(ctx context.Context, userID string, limi
 	if limit > uc.cfg.MaxLimit {
 		limit = uc.cfg.MaxLimit
 	}
-	return uc.dispatcher.Dispatch(ctx, algo, userID, limit, uc.cfg)
+	movies, err := uc.dispatcher.Dispatch(ctx, algo, userID, limit, uc.cfg)
+	if err != nil {
+		return nil, err
+	}
+	if len(movies) > 0 || algo == entity.AlgorithmPopular {
+		return movies, nil
+	}
+	log.Ctx(ctx).Info().
+		Str("selectedAlgorithm", string(algo)).
+		Str("fallbackAlgorithm", string(entity.AlgorithmPopular)).
+		Int("limit", limit).
+		Msg("suggestion fallback applied")
+
+	return uc.dispatcher.Dispatch(ctx, entity.AlgorithmPopular, userID, limit, uc.cfg)
 }

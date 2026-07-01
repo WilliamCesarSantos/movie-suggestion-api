@@ -46,6 +46,31 @@ func (m *mockSuggestionRepository) FindSerendipity(ctx context.Context, userID s
 	return m.movies, m.err
 }
 
+type fallbackSuggestionRepository struct {
+	popularMovies       []*entity.Movie
+	collaborativeMovies []*entity.Movie
+}
+
+func (m *fallbackSuggestionRepository) FindPopular(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+	return m.popularMovies, nil
+}
+
+func (m *fallbackSuggestionRepository) FindContentBased(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+	return nil, nil
+}
+
+func (m *fallbackSuggestionRepository) FindCollaborative(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+	return m.collaborativeMovies, nil
+}
+
+func (m *fallbackSuggestionRepository) FindHybrid(ctx context.Context, userID string, limit int, minRating float64, contentWeight, collaborativeWeight float64) ([]*entity.Movie, error) {
+	return nil, nil
+}
+
+func (m *fallbackSuggestionRepository) FindSerendipity(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+	return nil, nil
+}
+
 func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 	cfg := config.SuggestionConfig{
 		DefaultLimit:            10,
@@ -111,5 +136,24 @@ func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		_ = result
+	})
+
+	t.Run("falls back to popular when selected algorithm returns empty", func(t *testing.T) {
+		popularMovies := []*entity.Movie{{ID: "m-pop-1", Title: "Popular Movie"}}
+		userRepo := &mockUserRepository{user: &entity.User{ID: "user1", WatchCount: 20}}
+		suggRepo := &fallbackSuggestionRepository{
+			popularMovies:       popularMovies,
+			collaborativeMovies: []*entity.Movie{},
+		}
+		dispatcher := suggestion.NewAlgorithmDispatcher(suggRepo)
+		uc := appusecase.NewSuggestMoviesUseCase(userRepo, suggRepo, selector, dispatcher, cfg)
+
+		result, err := uc.Execute(context.Background(), "user1", 10, nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 1 || result[0].ID != "m-pop-1" {
+			t.Fatalf("expected fallback popular movie, got %#v", result)
+		}
 	})
 }

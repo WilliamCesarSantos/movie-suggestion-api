@@ -47,7 +47,7 @@ func (c *Consumer) Start(ctx context.Context) {
 				WaitTimeSeconds:     20,
 			})
 			if err != nil {
-				c.logger.Error().Err(err).Msg("SQS receive error")
+				c.logger.Error().Str("correlationId", "system").Err(err).Msg("SQS receive error")
 				continue
 			}
 			for _, msg := range out.Messages {
@@ -63,13 +63,17 @@ func (c *Consumer) Start(ctx context.Context) {
 
 func (c *Consumer) worker(ctx context.Context, msgCh <-chan types.Message) {
 	for msg := range msgCh {
+		messageID := ""
+		if msg.MessageId != nil {
+			messageID = *msg.MessageId
+		}
 		var im ImportMessage
 		if err := json.Unmarshal([]byte(*msg.Body), &im); err != nil {
-			c.logger.Error().Err(err).Msg("failed to unmarshal SQS message")
+			c.logger.Error().Str("correlationId", "system").Str("messageId", messageID).Err(err).Msg("failed to unmarshal SQS message")
 			continue
 		}
 		if err := c.processor.Process(ctx, im.ImdbID); err != nil {
-			c.logger.Error().Err(err).Str("imdbId", im.ImdbID).Msg("failed to process movie import")
+			c.logger.Error().Str("correlationId", "system").Str("messageId", messageID).Err(err).Str("imdbId", im.ImdbID).Msg("failed to process movie import")
 			continue
 		}
 		_, err := c.sqsClient.DeleteMessage(ctx, &awssqs.DeleteMessageInput{
@@ -77,7 +81,7 @@ func (c *Consumer) worker(ctx context.Context, msgCh <-chan types.Message) {
 			ReceiptHandle: msg.ReceiptHandle,
 		})
 		if err != nil {
-			c.logger.Error().Err(err).Msg("failed to delete SQS message")
+			c.logger.Error().Str("correlationId", "system").Str("messageId", messageID).Err(err).Msg("failed to delete SQS message")
 		}
 	}
 }
