@@ -17,6 +17,12 @@ services:
       POSTGRES_DB: movie_suggestion
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d movie_suggestion"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
     ports:
       - "5432:5432"
     volumes:
@@ -79,16 +85,20 @@ services:
       JWT_SECRET: dev-secret
       JWT_EXPIRY_HOURS: "24"
       ARGON2_PEPPER: movie-suggestion-123456
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://movie-suggestion-api-jaeger:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: movie-suggestion-api-jaeger:4317
       OTEL_SERVICE_NAME: movie-suggestion-api
       SERVER_PORT: "8080"
       METRICS_PORT: "9090"
-      OMDB_API_KEY: your_omdb_api_key
+      OMDB_API_KEY: your-omdb-api-key
     depends_on:
-      - movie-suggestion-api-neo4j
-      - movie-suggestion-api-localstack
-      - movie-suggestion-api-jaeger
-      - movie-suggestion-api-postgres
+      movie-suggestion-api-neo4j:
+        condition: service_started
+      movie-suggestion-api-localstack:
+        condition: service_started
+      movie-suggestion-api-jaeger:
+        condition: service_started
+      movie-suggestion-api-postgres:
+        condition: service_healthy
 
   movie-suggestion-api-nginx:
     image: nginx:1.27-alpine
