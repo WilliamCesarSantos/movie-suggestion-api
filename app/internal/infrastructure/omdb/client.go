@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ type SearchResult struct {
 type SearchResponse struct {
 	Search   []SearchResult `json:"Search"`
 	Response string         `json:"Response"`
+	Error    string         `json:"Error"`
 }
 
 type MovieResponse struct {
@@ -44,15 +46,24 @@ type Client struct {
 
 func NewClient(baseURL, apiKey string, timeoutSeconds int) *Client {
 	return &Client{
-		baseURL: baseURL,
-		apiKey:  apiKey,
+		baseURL:    baseURL,
+		apiKey:     apiKey,
 		httpClient: &http.Client{Timeout: time.Duration(timeoutSeconds) * time.Second},
 	}
 }
 
 func (c *Client) Search(ctx context.Context, term string, page int) ([]SearchResult, error) {
-	url := fmt.Sprintf("%s/?apikey=%s&s=%s&page=%d", c.baseURL, c.apiKey, term, page)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	base, err := url.Parse(c.baseURL)
+	if err != nil {
+		return nil, err
+	}
+	q := base.Query()
+	q.Set("apikey", c.apiKey)
+	q.Set("s", term)
+	q.Set("page", strconv.Itoa(page))
+	base.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +78,9 @@ func (c *Client) Search(ctx context.Context, term string, page int) ([]SearchRes
 		return nil, err
 	}
 	if result.Response != "True" {
+		if strings.EqualFold(result.Error, "Movie not found!") {
+			return []SearchResult{}, nil
+		}
 		return nil, fmt.Errorf("OMDB search failed for term %q", term)
 	}
 	return result.Search, nil

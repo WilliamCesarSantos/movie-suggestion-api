@@ -42,8 +42,9 @@ func provideConfig() (*config.Config, error) {
 func provideLogger(cfg *config.Config) zerolog.Logger {
 	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
 	if cfg.Log.Pretty {
-		logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
+		logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Logger()
 	}
+	log.Logger = logger
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	return logger
 }
@@ -248,9 +249,9 @@ func registerLifecycle(p serverParams) {
 				Handler: metricsMux,
 			}
 			go func() {
-				p.Logger.Info().Int("port", p.Config.Server.MetricsPort).Msg("metrics server starting")
+				p.Logger.Info().Str("correlationId", "system").Int("port", p.Config.Server.MetricsPort).Msg("metrics server starting")
 				if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error().Err(err).Msg("metrics server error")
+					p.Logger.Error().Str("correlationId", "system").Err(err).Msg("metrics server error")
 				}
 			}()
 
@@ -259,9 +260,9 @@ func registerLifecycle(p serverParams) {
 				Handler: p.Router,
 			}
 			go func() {
-				p.Logger.Info().Int("port", p.Config.Server.Port).Msg("API server starting")
+				p.Logger.Info().Str("correlationId", "system").Int("port", p.Config.Server.Port).Msg("API server starting")
 				if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error().Err(err).Msg("API server error")
+					p.Logger.Error().Str("correlationId", "system").Err(err).Msg("API server error")
 				}
 			}()
 
@@ -272,13 +273,13 @@ func registerLifecycle(p serverParams) {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			p.Logger.Info().Msg("shutting down...")
+			p.Logger.Info().Str("correlationId", "system").Msg("shutting down...")
 			consumerCancel()
 			if err := apiServer.Shutdown(ctx); err != nil {
-				p.Logger.Error().Err(err).Msg("API server shutdown error")
+				p.Logger.Error().Str("correlationId", "system").Err(err).Msg("API server shutdown error")
 			}
 			if err := metricsServer.Shutdown(ctx); err != nil {
-				p.Logger.Error().Err(err).Msg("metrics server shutdown error")
+				p.Logger.Error().Str("correlationId", "system").Err(err).Msg("metrics server shutdown error")
 			}
 			return nil
 		},
@@ -291,7 +292,7 @@ func registerTracer(lc fx.Lifecycle, cfg *config.Config, logger zerolog.Logger) 
 		OnStart: func(_ context.Context) error {
 			shutdown, err := observability.InitTracer(cfg.Otel)
 			if err != nil {
-				logger.Warn().Err(err).Msg("failed to initialize tracer, continuing without tracing")
+				logger.Warn().Str("correlationId", "system").Err(err).Msg("failed to initialize tracer, continuing without tracing")
 				return nil
 			}
 			tracerShutdown = shutdown

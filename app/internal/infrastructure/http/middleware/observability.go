@@ -7,6 +7,7 @@ import (
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/observability"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -32,6 +33,13 @@ func ObservabilityMiddleware(metrics *observability.Metrics) func(http.Handler) 
 			w.Header().Set("X-Correlation-ID", correlationID)
 
 			ctx, span := tracer.Start(r.Context(), r.Method+" "+r.URL.Path)
+			logger := log.Logger.With().
+				Str("correlationId", correlationID).
+				Str("method", r.Method).
+				Str("path", r.URL.Path).
+				Logger()
+			ctx = logger.WithContext(ctx)
+
 			span.SetAttributes(
 				attribute.String("http.method", r.Method),
 				attribute.String("http.path", r.URL.Path),
@@ -47,6 +55,11 @@ func ObservabilityMiddleware(metrics *observability.Metrics) func(http.Handler) 
 			statusStr := strconv.Itoa(rw.status)
 			metrics.HttpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, statusStr).Inc()
 			metrics.HttpRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
+
+			log.Ctx(ctx).Info().
+				Int("status", rw.status).
+				Float64("durationMs", duration*1000).
+				Msg("request completed")
 		})
 	}
 }

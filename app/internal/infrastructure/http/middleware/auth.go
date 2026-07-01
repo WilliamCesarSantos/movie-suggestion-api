@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
+	"github.com/rs/zerolog/log"
 )
 
 type contextKey string
@@ -27,12 +28,14 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			log.Ctx(r.Context()).Warn().Msg("missing or malformed authorization header")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		token := strings.TrimPrefix(authHeader, "Bearer ")
 		claims, err := m.jwtService.Validate(token)
 		if err != nil {
+			log.Ctx(r.Context()).Warn().Err(err).Msg("invalid JWT token")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

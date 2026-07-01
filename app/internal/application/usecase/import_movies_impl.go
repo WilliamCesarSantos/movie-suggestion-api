@@ -22,12 +22,15 @@ func (uc *importMoviesUseCase) Execute(ctx context.Context, searchTerms []string
 			for page := 1; page <= maxPages; page++ {
 				results, err := uc.searcher.Search(context.Background(), term, page)
 				if err != nil {
-					log.Error().Err(err).Str("term", term).Int("page", page).Msg("OMDB search error")
+					log.Error().Str("correlationId", "system").Err(err).Str("term", term).Int("page", page).Msg("OMDB search error")
 					continue
+				}
+				if len(results) == 0 {
+					break
 				}
 				for _, r := range results {
 					if err := uc.publisher.Publish(context.Background(), r.ImdbID); err != nil {
-						log.Error().Err(err).Str("imdbId", r.ImdbID).Msg("failed to publish import message")
+						log.Error().Str("correlationId", "system").Err(err).Str("imdbId", r.ImdbID).Msg("failed to publish import message")
 					}
 				}
 			}
