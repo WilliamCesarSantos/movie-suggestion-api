@@ -35,6 +35,7 @@ func ObservabilityMiddleware(metrics *observability.Metrics) func(http.Handler) 
 			ctx, span := tracer.Start(r.Context(), r.Method+" "+r.URL.Path)
 			logger := log.Logger.With().
 				Str("correlationId", correlationID).
+				Str("username", "anonymous").
 				Str("method", r.Method).
 				Str("path", r.URL.Path).
 				Logger()

@@ -17,12 +17,17 @@ func NewImportMoviesUseCase(searcher domainusecase.OmdbSearcher, publisher domai
 }
 
 func (uc *importMoviesUseCase) Execute(ctx context.Context, searchTerms []string, maxPages int) error {
+	systemLogger := log.Ctx(ctx).With().
+		Str("correlationId", "system").
+		Str("username", "system").
+		Logger()
+
 	go func() {
 		for _, term := range searchTerms {
 			for page := 1; page <= maxPages; page++ {
 				results, err := uc.searcher.Search(context.Background(), term, page)
 				if err != nil {
-					log.Error().Str("correlationId", "system").Err(err).Str("term", term).Int("page", page).Msg("OMDB search error")
+					systemLogger.Error().Err(err).Str("term", term).Int("page", page).Msg("OMDB search error")
 					continue
 				}
 				if len(results) == 0 {
@@ -30,7 +35,7 @@ func (uc *importMoviesUseCase) Execute(ctx context.Context, searchTerms []string
 				}
 				for _, r := range results {
 					if err := uc.publisher.Publish(context.Background(), r.ImdbID); err != nil {
-						log.Error().Str("correlationId", "system").Err(err).Str("imdbId", r.ImdbID).Msg("failed to publish import message")
+						systemLogger.Error().Err(err).Str("imdbId", r.ImdbID).Msg("failed to publish import message")
 					}
 				}
 			}

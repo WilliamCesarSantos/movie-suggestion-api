@@ -149,7 +149,7 @@ go run ./cmd/api
 | `OTEL_SERVICE_NAME` | `movie-suggestion` | Service name for traces |
 | `SERVER_PORT` | `8080` | HTTP API port |
 | `METRICS_PORT` | `9090` | Prometheus metrics port |
-| `LOG_PRETTY` | `false` | Enable pretty console logging |
+| `LOG_PRETTY` | `false` | Deprecated: logs are always emitted in JSON |
 
 ---
 

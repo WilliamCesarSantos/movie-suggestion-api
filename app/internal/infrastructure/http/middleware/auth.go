@@ -14,6 +14,7 @@ type contextKey string
 const (
 	ContextKeyUserID contextKey = "userId"
 	ContextKeyRoles  contextKey = "roles"
+	ContextKeyUsername contextKey = "username"
 )
 
 type AuthMiddleware struct {
@@ -41,6 +42,9 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		}
 		ctx := context.WithValue(r.Context(), ContextKeyUserID, claims.Subject)
 		ctx = context.WithValue(ctx, ContextKeyRoles, claims.Roles)
+		ctx = context.WithValue(ctx, ContextKeyUsername, claims.Email)
+		logger := log.Ctx(ctx).With().Str("username", claims.Email).Logger()
+		ctx = logger.WithContext(ctx)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

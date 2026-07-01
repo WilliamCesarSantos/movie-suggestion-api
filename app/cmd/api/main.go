@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/config"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
@@ -39,11 +41,19 @@ func provideConfig() (*config.Config, error) {
 	return config.Load()
 }
 
-func provideLogger(cfg *config.Config) zerolog.Logger {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
-	if cfg.Log.Pretty {
-		logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Logger()
+func provideLogger(_ *config.Config) zerolog.Logger {
+	zerolog.TimestampFieldName = "horario"
+	zerolog.MessageFieldName = "mensagem"
+	zerolog.CallerFieldName = "emissor"
+	zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string {
+		return fmt.Sprintf("%s:%d", filepath.Base(file), line)
 	}
+
+	logger := zerolog.New(os.Stdout).With().
+		Timestamp().
+		Caller().
+		Str("thread", strconv.Itoa(os.Getpid())).
+		Logger()
 	log.Logger = logger
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	return logger
@@ -239,6 +249,10 @@ func registerLifecycle(p serverParams) {
 		metricsServer  *http.Server
 		consumerCancel context.CancelFunc
 	)
+	systemLogger := p.Logger.With().
+		Str("correlationId", "system").
+		Str("username", "system").
+		Logger()
 
 	p.LC.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
@@ -249,9 +263,9 @@ func registerLifecycle(p serverParams) {
 				Handler: metricsMux,
 			}
 			go func() {
-				p.Logger.Info().Str("correlationId", "system").Int("port", p.Config.Server.MetricsPort).Msg("metrics server starting")
+				systemLogger.Info().Int("port", p.Config.Server.MetricsPort).Msg("metrics server starting")
 				if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error().Str("correlationId", "system").Err(err).Msg("metrics server error")
+					systemLogger.Error().Err(err).Msg("metrics server error")
 				}
 			}()
 
@@ -260,9 +274,9 @@ func registerLifecycle(p serverParams) {
 				Handler: p.Router,
 			}
 			go func() {
-				p.Logger.Info().Str("correlationId", "system").Int("port", p.Config.Server.Port).Msg("API server starting")
+				systemLogger.Info().Int("port", p.Config.Server.Port).Msg("API server starting")
 				if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error().Str("correlationId", "system").Err(err).Msg("API server error")
+					systemLogger.Error().Err(err).Msg("API server error")
 				}
 			}()
 
@@ -273,13 +287,13 @@ func registerLifecycle(p serverParams) {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			p.Logger.Info().Str("correlationId", "system").Msg("shutting down...")
+			systemLogger.Info().Msg("shutting down...")
 			consumerCancel()
 			if err := apiServer.Shutdown(ctx); err != nil {
-				p.Logger.Error().Str("correlationId", "system").Err(err).Msg("API server shutdown error")
+				systemLogger.Error().Err(err).Msg("API server shutdown error")
 			}
 			if err := metricsServer.Shutdown(ctx); err != nil {
-				p.Logger.Error().Str("correlationId", "system").Err(err).Msg("metrics server shutdown error")
+				systemLogger.Error().Err(err).Msg("metrics server shutdown error")
 			}
 			return nil
 		},
@@ -288,11 +302,15 @@ func registerLifecycle(p serverParams) {
 
 func registerTracer(lc fx.Lifecycle, cfg *config.Config, logger zerolog.Logger) {
 	var tracerShutdown func(context.Context) error
+	systemLogger := logger.With().
+		Str("correlationId", "system").
+		Str("username", "system").
+		Logger()
 	lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
 			shutdown, err := observability.InitTracer(cfg.Otel)
 			if err != nil {
-				logger.Warn().Str("correlationId", "system").Err(err).Msg("failed to initialize tracer, continuing without tracing")
+				systemLogger.Warn().Err(err).Msg("failed to initialize tracer, continuing without tracing")
 				return nil
 			}
 			tracerShutdown = shutdown
