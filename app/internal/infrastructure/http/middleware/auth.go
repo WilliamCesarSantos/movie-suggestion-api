@@ -12,8 +12,8 @@ import (
 type contextKey string
 
 const (
-	ContextKeyUserID contextKey = "userId"
-	ContextKeyRoles  contextKey = "roles"
+	ContextKeyUserID   contextKey = "userId"
+	ContextKeyRoles    contextKey = "roles"
 	ContextKeyUsername contextKey = "username"
 )
 
