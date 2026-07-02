@@ -40,9 +40,13 @@ func provideConfig() (*config.Config, error) {
 }
 
 func provideLogger(cfg *config.Config) zerolog.Logger {
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	hostname, _ := os.Hostname()
+	base := zerolog.New(os.Stdout).With().Timestamp().Str("pod", hostname)
+	var logger zerolog.Logger
 	if cfg.Log.Pretty {
-		logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Logger()
+		logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).With().Timestamp().Str("pod", hostname).Logger()
+	} else {
+		logger = base.Logger()
 	}
 	log.Logger = logger
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)

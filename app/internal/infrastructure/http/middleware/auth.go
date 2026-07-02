@@ -12,9 +12,10 @@ import (
 type contextKey string
 
 const (
-	ContextKeyUserID    contextKey = "userId"
-	ContextKeyUserEmail contextKey = "userEmail"
-	ContextKeyRoles     contextKey = "roles"
+	ContextKeyUserID        contextKey = "userId"
+	ContextKeyUserEmail     contextKey = "userEmail"
+	ContextKeyRoles         contextKey = "roles"
+	ContextKeyCorrelationID contextKey = "correlationId"
 )
 
 type AuthMiddleware struct {
