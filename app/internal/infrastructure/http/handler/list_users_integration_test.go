@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/handler"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
@@ -29,7 +29,7 @@ func buildListUsersRouter(jwtService *auth.JWTService, listUC domainusecase.List
 	manageUC := &integrationManageUserUseCase{}
 	suggestUC := &integrationSuggestMoviesUseCase{}
 	updateUC := &integrationUpdateUserProfileUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, updateUC, listUC, nil, nil)
+	h := handler.NewUserHandler(manageUC, suggestUC, updateUC, listUC, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()
