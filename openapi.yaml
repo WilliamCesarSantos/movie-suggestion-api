@@ -104,6 +104,63 @@ paths:
                 example: email already exists
         "500":
           $ref: "#/components/responses/InternalError"
+    get:
+      tags: [Users]
+      summary: List users
+      description: >
+        Returns a paginated list of users. Requires `users:read` role.
+
+        **Visibility rule:**
+        - Users with only `users:read` (without `users:write` or `*`) see only their own record.
+          The `email` filter is automatically forced to the caller's email.
+        - Users with `users:write` or `*` can list and filter all users.
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: email
+          in: query
+          description: Filter by exact email address.
+          schema:
+            type: string
+            format: email
+            example: alice@example.com
+        - name: name
+          in: query
+          description: Filter by name (case-insensitive partial match).
+          schema:
+            type: string
+            example: Alice
+        - name: page
+          in: query
+          description: Page number (1-based, default 1).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: Items per page (1–100, default 20).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUsersResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/users/{id}:
     get:
@@ -136,8 +193,9 @@ paths:
       tags: [Suggestions]
       summary: Get movie suggestions
       description: >
-        Returns personalized movie recommendations for the authenticated user.
-        The user ID is extracted from the Bearer token — no path parameter required.
+        Returns personalized movie recommendations for the authenticated user
+        using cursor-based pagination.
+        The user ID is extracted from the ****** — no path parameter required.
         The algorithm is auto-selected based on the user's watch history
         or can be overridden via the `algorithm` query parameter.
         Requires `suggestions:read` role.
@@ -155,12 +213,17 @@ paths:
       parameters:
         - name: limit
           in: query
-          description: Number of suggestions to return (default 10, max 50).
+          description: Number of suggestions to return per page (default 10, max 50).
           schema:
             type: integer
             minimum: 1
             maximum: 50
             default: 10
+        - name: cursor
+          in: query
+          description: Opaque cursor token for pagination. Obtain from `nextCursor` or `prevCursor` in the previous response.
+          schema:
+            type: string
         - name: algorithm
           in: query
           description: Override the auto-selected recommendation algorithm.
@@ -168,65 +231,22 @@ paths:
             $ref: "#/components/schemas/SuggestionAlgorithm"
       responses:
         "200":
-          description: List of suggested movies
+          description: Paginated list of suggested movies
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/MovieSummary"
+                $ref: "#/components/schemas/SuggestionsPageResponse"
         "400":
-          description: Unknown algorithm
+          description: Invalid limit or cursor parameter, or unknown algorithm
           content:
             text/plain:
               schema:
                 type: string
-                example: algorithm not found
+                example: invalid cursor
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /api/v1/movies:
-    get:
-      tags: [Movies]
-      summary: List movies
-      description: >
-        Returns a paginated list of movies with summary fields only
-        (`id`, `title`, `year`, `poster`, `imdbRating`).
-        Requires `movies:read` role.
-      operationId: listMovies
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: page
-          in: query
-          description: Page number (1-based).
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
-        - name: limit
-          in: query
-          description: Items per page (max 100).
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 20
-      responses:
-        "200":
-          description: Paginated movie list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListMoviesResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          $ref: "#/components/responses/Forbidden"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -612,23 +632,6 @@ components:
           format: float
           example: 8.7
 
-    ListMoviesResponse:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: "#/components/schemas/MovieSummary"
-        page:
-          type: integer
-          example: 1
-        limit:
-          type: integer
-          example: 20
-        total:
-          type: integer
-          example: 142
-
     RecordWatchedRequest:
       type: object
       required: [rating, reaction]
@@ -683,6 +686,88 @@ components:
           default: 1
           description: Number of OMDB result pages to fetch per search term (10 movies/page).
           example: 3
+
+    ListUsersItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 90b4fd08-ee46-4d54-a7c0-1bab4857cec3
+        name:
+          type: string
+          example: Alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["users:read", "suggestions:read"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-30T12:00:00Z"
+
+    ListUsersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListUsersItem"
+        total:
+          type: integer
+          description: Total number of matching users.
+          example: 42
+        page:
+          type: integer
+          description: Current page number (1-based).
+          example: 1
+        pageSize:
+          type: integer
+          description: Number of items per page.
+          example: 20
+
+    SuggestionsPageResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MovieSummary"
+        nextCursor:
+          type: string
+          nullable: true
+          description: Opaque cursor to retrieve the next page. Null when there is no next page.
+          example: eyJvZmZzZXQiOjEwLCJ0b3RhbCI6NDB9...
+        prevCursor:
+          type: string
+          nullable: true
+          description: Opaque cursor to retrieve the previous page. Null when there is no previous page.
+          example: eyJvZmZzZXQiOjAsInRvdGFsIjo0MH0=...
+        hasNext:
+          type: boolean
+          description: Whether there is a next page.
+          example: true
+        hasPrev:
+          type: boolean
+          description: Whether there is a previous page.
+          example: false
+        limit:
+          type: integer
+          description: Page size used in this request.
+          example: 10
+        count:
+          type: integer
+          description: Number of items in this page.
+          example: 10
+        total:
+          type: integer
+          description: Total number of matching suggestions.
+          example: 40
 
     SuggestionAlgorithm:
       type: string
