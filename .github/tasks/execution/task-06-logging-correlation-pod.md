@@ -40,12 +40,12 @@ Padronizar logs da aplicacao e garantir rastreabilidade ponta a ponta, incluindo
 
 ## Checklist de pronto
 
-- [ ] Campos obrigatorios presentes nos logs relevantes
-- [ ] Campo pod presente via hostname
-- [ ] CorrelationId propagado em MessageAttributes no produtor
-- [ ] CorrelationId recuperado e usado no consumidor
-- [ ] Testes de integracao comprovando fluxo ponta a ponta
-- [ ] go test ./... verde
+- [x] Campos obrigatorios presentes nos logs relevantes
+- [x] Campo pod presente via hostname
+- [x] CorrelationId propagado em MessageAttributes no produtor
+- [x] CorrelationId recuperado e usado no consumidor
+- [x] Testes de integracao comprovando fluxo ponta a ponta
+- [x] go test ./... verde
 
 ## Evidencias esperadas
 

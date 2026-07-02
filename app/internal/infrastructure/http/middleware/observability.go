@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -33,6 +34,7 @@ func ObservabilityMiddleware(metrics *observability.Metrics) func(http.Handler) 
 			w.Header().Set("X-Correlation-ID", correlationID)
 
 			ctx, span := tracer.Start(r.Context(), r.Method+" "+r.URL.Path)
+			ctx = context.WithValue(ctx, ContextKeyCorrelationID, correlationID)
 			logger := log.Logger.With().
 				Str("correlationId", correlationID).
 				Str("method", r.Method).
