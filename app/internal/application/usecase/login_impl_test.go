@@ -50,6 +50,14 @@ func TestLoginUseCase_Execute(t *testing.T) {
 	if len(result.Roles) != 1 || result.Roles[0] != "users:read" {
 		t.Fatalf("unexpected roles: %#v", result.Roles)
 	}
+
+	claims, err := jwtService.Validate(result.Token)
+	if err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+	if claims.Email != "user@example.com" {
+		t.Fatalf("expected token email user@example.com, got %s", claims.Email)
+	}
 }
 
 func TestLoginUseCase_ExecuteInvalidCredentials(t *testing.T) {

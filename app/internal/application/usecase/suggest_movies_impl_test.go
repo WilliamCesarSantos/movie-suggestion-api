@@ -20,6 +20,9 @@ func (m *mockUserRepository) Create(ctx context.Context, user *entity.User) erro
 func (m *mockUserRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	return m.user, m.err
 }
+func (m *mockUserRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
+	return m.user, m.err
+}
 func (m *mockUserRepository) UpdateProfile(ctx context.Context, user *entity.User) error { return nil }
 func (m *mockUserRepository) RecordWatched(ctx context.Context, userID, movieID string, userRating float64, reaction string) error {
 	return nil
@@ -88,7 +91,7 @@ func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 		suggRepo := &mockSuggestionRepository{}
 		dispatcher := suggestion.NewAlgorithmDispatcher(suggRepo)
 		uc := appusecase.NewSuggestMoviesUseCase(userRepo, suggRepo, selector, dispatcher, cfg)
-		_, err := uc.Execute(context.Background(), "user1", 10, nil)
+		_, err := uc.Execute(context.Background(), "user@example.com", 10, nil)
 		if !errors.Is(err, entity.ErrUserNotFound) {
 			t.Errorf("expected ErrUserNotFound, got %v", err)
 		}
@@ -100,7 +103,7 @@ func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 		suggRepo := &mockSuggestionRepository{movies: movies}
 		dispatcher := suggestion.NewAlgorithmDispatcher(suggRepo)
 		uc := appusecase.NewSuggestMoviesUseCase(userRepo, suggRepo, selector, dispatcher, cfg)
-		result, err := uc.Execute(context.Background(), "user1", 10, nil)
+		result, err := uc.Execute(context.Background(), "user@example.com", 10, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -116,7 +119,7 @@ func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 		dispatcher := suggestion.NewAlgorithmDispatcher(suggRepo)
 		uc := appusecase.NewSuggestMoviesUseCase(userRepo, suggRepo, selector, dispatcher, cfg)
 		algo := entity.AlgorithmSerendipity
-		result, err := uc.Execute(context.Background(), "user1", 10, &algo)
+		result, err := uc.Execute(context.Background(), "user@example.com", 10, &algo)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -131,7 +134,7 @@ func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 		suggRepo := &mockSuggestionRepository{movies: movies}
 		dispatcher := suggestion.NewAlgorithmDispatcher(suggRepo)
 		uc := appusecase.NewSuggestMoviesUseCase(userRepo, suggRepo, selector, dispatcher, cfg)
-		result, err := uc.Execute(context.Background(), "user1", 0, nil)
+		result, err := uc.Execute(context.Background(), "user@example.com", 0, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -148,7 +151,7 @@ func TestSuggestMoviesUseCase_Execute(t *testing.T) {
 		dispatcher := suggestion.NewAlgorithmDispatcher(suggRepo)
 		uc := appusecase.NewSuggestMoviesUseCase(userRepo, suggRepo, selector, dispatcher, cfg)
 
-		result, err := uc.Execute(context.Background(), "user1", 10, nil)
+		result, err := uc.Execute(context.Background(), "user@example.com", 10, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

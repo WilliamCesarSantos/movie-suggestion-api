@@ -7,5 +7,5 @@ import (
 )
 
 type SuggestMoviesUseCase interface {
-	Execute(ctx context.Context, userID string, limit int, algorithmOverride *entity.SuggestionAlgorithm) ([]*entity.Movie, error)
+	Execute(ctx context.Context, userEmail string, limit int, algorithmOverride *entity.SuggestionAlgorithm) ([]*entity.Movie, error)
 }
