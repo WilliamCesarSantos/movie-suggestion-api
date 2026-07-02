@@ -9,6 +9,5 @@ import (
 type MovieRepository interface {
 	FindByID(ctx context.Context, id string) (*entity.Movie, error)
 	FindByImdbID(ctx context.Context, imdbID string) (*entity.Movie, error)
-	FindAll(ctx context.Context, page, limit int) ([]*entity.Movie, int, error)
 	Upsert(ctx context.Context, movie *entity.Movie) error
 }

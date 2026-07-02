@@ -42,46 +42,6 @@ func (r *movieRepository) FindByID(ctx context.Context, id string) (*entity.Movi
 	return recordToMovieFull(result.Records[0])
 }
 
-func (r *movieRepository) FindAll(ctx context.Context, page, limit int) ([]*entity.Movie, int, error) {
-	skip := (page - 1) * limit
-
-	countResult, err := neo4j.ExecuteQuery(ctx, r.driver,
-		"MATCH (m:Movie) RETURN count(m) AS total",
-		nil,
-		neo4j.EagerResultTransformer,
-		neo4j.ExecuteQueryWithDatabase(r.database),
-	)
-	if err != nil {
-		return nil, 0, err
-	}
-	total := 0
-	if len(countResult.Records) > 0 {
-		if v, ok := countResult.Records[0].Values[0].(int64); ok {
-			total = int(v)
-		}
-	}
-
-	result, err := neo4j.ExecuteQuery(ctx, r.driver,
-		"MATCH (m:Movie) RETURN m ORDER BY m.title SKIP $skip LIMIT $limit",
-		map[string]any{"skip": int64(skip), "limit": int64(limit)},
-		neo4j.EagerResultTransformer,
-		neo4j.ExecuteQueryWithDatabase(r.database),
-	)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	movies := make([]*entity.Movie, 0, len(result.Records))
-	for _, rec := range result.Records {
-		m, err := recordToMovie(rec)
-		if err != nil {
-			return nil, 0, err
-		}
-		movies = append(movies, m)
-	}
-	return movies, total, nil
-}
-
 func (r *movieRepository) FindByImdbID(ctx context.Context, imdbID string) (*entity.Movie, error) {
 	result, err := neo4j.ExecuteQuery(ctx, r.driver,
 		"MATCH (m:Movie {imdbId: $imdbId}) RETURN m",
