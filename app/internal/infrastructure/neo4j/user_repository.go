@@ -52,6 +52,22 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 	return recordToUser(result.Records[0])
 }
 
+func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
+	result, err := neo4j.ExecuteQuery(ctx, r.driver,
+		"MATCH (u:User {email: $email}) RETURN u",
+		map[string]any{"email": email},
+		neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase(r.database),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.Records) == 0 {
+		return nil, entity.ErrUserNotFound
+	}
+	return recordToUser(result.Records[0])
+}
+
 func (r *userRepository) UpdateProfile(ctx context.Context, user *entity.User) error {
 	_, err := neo4j.ExecuteQuery(ctx, r.driver,
 		`MATCH (u:User {id: $id})

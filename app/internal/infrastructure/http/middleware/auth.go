@@ -12,8 +12,9 @@ import (
 type contextKey string
 
 const (
-	ContextKeyUserID contextKey = "userId"
-	ContextKeyRoles  contextKey = "roles"
+	ContextKeyUserID    contextKey = "userId"
+	ContextKeyUserEmail contextKey = "userEmail"
+	ContextKeyRoles     contextKey = "roles"
 )
 
 type AuthMiddleware struct {
@@ -39,7 +40,13 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
+		if claims.Email == "" {
+			log.Ctx(r.Context()).Warn().Msg("JWT token missing email claim")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		ctx := context.WithValue(r.Context(), ContextKeyUserID, claims.Subject)
+		ctx = context.WithValue(ctx, ContextKeyUserEmail, claims.Email)
 		ctx = context.WithValue(ctx, ContextKeyRoles, claims.Roles)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

@@ -133,7 +133,11 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
-	id, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	email, _ := r.Context().Value(middleware.ContextKeyUserEmail).(string)
+	if email == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	limitStr := r.URL.Query().Get("limit")
 	limit := 0
@@ -147,7 +151,7 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		algoOverride = &algo
 	}
 
-	movies, err := h.suggestUC.Execute(r.Context(), id, limit, algoOverride)
+	movies, err := h.suggestUC.Execute(r.Context(), email, limit, algoOverride)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)

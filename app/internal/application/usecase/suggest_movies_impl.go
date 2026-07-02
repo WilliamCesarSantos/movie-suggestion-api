@@ -23,8 +23,8 @@ func NewSuggestMoviesUseCase(userRepo repository.UserRepository, suggestionRepo 
 	return &suggestMoviesUseCase{userRepo: userRepo, suggestionRepo: suggestionRepo, selector: selector, dispatcher: dispatcher, cfg: cfg}
 }
 
-func (uc *suggestMoviesUseCase) Execute(ctx context.Context, userID string, limit int, algorithmOverride *entity.SuggestionAlgorithm) ([]*entity.Movie, error) {
-	user, err := uc.userRepo.FindByID(ctx, userID)
+func (uc *suggestMoviesUseCase) Execute(ctx context.Context, userEmail string, limit int, algorithmOverride *entity.SuggestionAlgorithm) ([]*entity.Movie, error) {
+	user, err := uc.userRepo.FindByEmail(ctx, userEmail)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (uc *suggestMoviesUseCase) Execute(ctx context.Context, userID string, limi
 	if limit > uc.cfg.MaxLimit {
 		limit = uc.cfg.MaxLimit
 	}
-	movies, err := uc.dispatcher.Dispatch(ctx, algo, userID, limit, uc.cfg)
+	movies, err := uc.dispatcher.Dispatch(ctx, algo, user.ID, limit, uc.cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -51,5 +51,5 @@ func (uc *suggestMoviesUseCase) Execute(ctx context.Context, userID string, limi
 		Int("limit", limit).
 		Msg("suggestion fallback applied")
 
-	return uc.dispatcher.Dispatch(ctx, entity.AlgorithmPopular, userID, limit, uc.cfg)
+	return uc.dispatcher.Dispatch(ctx, entity.AlgorithmPopular, user.ID, limit, uc.cfg)
 }
