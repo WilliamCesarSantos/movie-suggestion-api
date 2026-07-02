@@ -85,7 +85,7 @@ func TestIntegration_LoginThenSuggestions_UsesEmailFromToken(t *testing.T) {
 	updateUC := &integrationUpdateUserProfileUseCase{}
 
 	authHandler := handler.NewAuthHandler(loginUC)
-	userHandler := handler.NewUserHandler(manageUC, suggestUC, updateUC, nil, nil, nil)
+	userHandler := handler.NewUserHandler(manageUC, suggestUC, updateUC, nil, nil, nil, "integration-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()
@@ -149,11 +149,13 @@ func TestIntegration_LoginThenSuggestions_UsesEmailFromToken(t *testing.T) {
 		t.Fatalf("expected suggest use case to receive email %s, got %s", expectedEmail, suggestUC.receivedEmail)
 	}
 
-	var suggestionsResp []map[string]any
+	var suggestionsResp struct {
+		Data []map[string]any `json:"data"`
+	}
 	if err := json.Unmarshal(suggestionsRec.Body.Bytes(), &suggestionsResp); err != nil {
 		t.Fatalf("json.Unmarshal(suggestions response) error = %v", err)
 	}
-	if len(suggestionsResp) != 1 {
-		t.Fatalf("expected 1 suggested movie, got %d", len(suggestionsResp))
+	if len(suggestionsResp.Data) != 1 {
+		t.Fatalf("expected 1 suggested movie, got %d", len(suggestionsResp.Data))
 	}
 }

@@ -182,8 +182,9 @@ func provideUserHandler(
 	listUsersUC domainusecase.ListUsersUseCase,
 	authRepo repository.AuthUserRepository,
 	ps *auth.PasswordService,
+	cfg *config.Config,
 ) *handler.UserHandler {
-	return handler.NewUserHandler(manageUC, suggestUC, updateUC, listUsersUC, authRepo, ps)
+	return handler.NewUserHandler(manageUC, suggestUC, updateUC, listUsersUC, authRepo, ps, cfg.Auth.Secret, cfg.Suggestion.MaxLimit)
 }
 
 func provideMovieHandler(getUC domainusecase.GetMovieUseCase, manageUC domainusecase.ManageUserUseCase) *handler.MovieHandler {
