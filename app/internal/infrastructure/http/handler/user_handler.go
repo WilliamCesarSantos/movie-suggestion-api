@@ -20,7 +20,6 @@ import (
 type UserHandler struct {
 	manageUserUC       domainusecase.ManageUserUseCase
 	suggestUC          domainusecase.SuggestMoviesUseCase
-	updateProfileUC    domainusecase.UpdateUserProfileUseCase
 	listUsersUC        domainusecase.ListUsersUseCase
 	authUserRepo       repository.AuthUserRepository
 	passwordService    *auth.PasswordService
@@ -31,7 +30,6 @@ type UserHandler struct {
 func NewUserHandler(
 	manageUserUC domainusecase.ManageUserUseCase,
 	suggestUC domainusecase.SuggestMoviesUseCase,
-	updateProfileUC domainusecase.UpdateUserProfileUseCase,
 	listUsersUC domainusecase.ListUsersUseCase,
 	authUserRepo repository.AuthUserRepository,
 	passwordService *auth.PasswordService,
@@ -41,7 +39,6 @@ func NewUserHandler(
 	return &UserHandler{
 		manageUserUC:       manageUserUC,
 		suggestUC:          suggestUC,
-		updateProfileUC:    updateProfileUC,
 		listUsersUC:        listUsersUC,
 		authUserRepo:       authUserRepo,
 		passwordService:    passwordService,
