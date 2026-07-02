@@ -35,10 +35,10 @@ Atualizar openapi.yaml para refletir exatamente o comportamento implementado.
 
 ## Checklist de pronto
 
-- [ ] openapi.yaml atualizado para todos endpoints alterados
-- [ ] Sem endpoints obsoletos
-- [ ] Parametros e respostas alinhados com implementacao
-- [ ] Revisao manual de consistencia concluida
+- [x] openapi.yaml atualizado para todos endpoints alterados
+- [x] Sem endpoints obsoletos
+- [x] Parametros e respostas alinhados com implementacao
+- [x] Revisao manual de consistencia concluida
 
 ## Evidencias esperadas
 
