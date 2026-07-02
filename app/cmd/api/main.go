@@ -157,10 +157,6 @@ func provideManageUserUseCase(repo repository.UserRepository, selector *suggesti
 	return appusecase.NewManageUserUseCase(repo, selector)
 }
 
-func provideUpdateProfileUseCase(repo repository.UserRepository) domainusecase.UpdateUserProfileUseCase {
-	return appusecase.NewUpdateUserProfileUseCase(repo)
-}
-
 func provideProcessImportUseCase(repo repository.MovieRepository, client *omdb.Client, metrics *observability.Metrics) appusecase.ProcessMovieImportUseCase {
 	return appusecase.NewProcessMovieImportUseCase(repo, client, metrics)
 }
@@ -182,13 +178,12 @@ func provideLoginUseCase(repo repository.AuthUserRepository, ps *auth.PasswordSe
 func provideUserHandler(
 	manageUC domainusecase.ManageUserUseCase,
 	suggestUC domainusecase.SuggestMoviesUseCase,
-	updateUC domainusecase.UpdateUserProfileUseCase,
 	listUsersUC domainusecase.ListUsersUseCase,
 	authRepo repository.AuthUserRepository,
 	ps *auth.PasswordService,
 	cfg *config.Config,
 ) *handler.UserHandler {
-	return handler.NewUserHandler(manageUC, suggestUC, updateUC, listUsersUC, authRepo, ps, cfg.Auth.Secret, cfg.Suggestion.MaxLimit)
+	return handler.NewUserHandler(manageUC, suggestUC, listUsersUC, authRepo, ps, cfg.Auth.Secret, cfg.Suggestion.MaxLimit)
 }
 
 func provideMovieHandler(getUC domainusecase.GetMovieUseCase, manageUC domainusecase.ManageUserUseCase) *handler.MovieHandler {
@@ -352,7 +347,6 @@ var applicationModule = fx.Module("application",
 		provideSuggestUseCase,
 		provideImportUseCase,
 		provideManageUserUseCase,
-		provideUpdateProfileUseCase,
 		provideProcessImportUseCase,
 		provideGetMovieUseCase,
 		provideLoginUseCase,

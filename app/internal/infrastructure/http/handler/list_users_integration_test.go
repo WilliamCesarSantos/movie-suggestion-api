@@ -28,8 +28,7 @@ func (s *stubListUsersUC) Execute(ctx context.Context, callerEmail string, calle
 func buildListUsersRouter(jwtService *auth.JWTService, listUC domainusecase.ListUsersUseCase) *chi.Mux {
 	manageUC := &integrationManageUserUseCase{}
 	suggestUC := &integrationSuggestMoviesUseCase{}
-	updateUC := &integrationUpdateUserProfileUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, updateUC, listUC, nil, nil, "test-secret", 50)
+	h := handler.NewUserHandler(manageUC, suggestUC, listUC, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()
