@@ -55,3 +55,48 @@ func (r *authUserRepository) FindByEmail(ctx context.Context, email string) (*en
 		CreatedAt: m.CreatedAt,
 	}, nil
 }
+
+func (r *authUserRepository) List(ctx context.Context, filters repository.AuthUserFilters) ([]*entity.AuthUser, int, error) {
+	query := r.db.WithContext(ctx).Model(&model.AuthUserModel{})
+	if filters.Email != "" {
+		query = query.Where("email = ?", filters.Email)
+	}
+	if filters.Name != "" {
+		query = query.Where("name ILIKE ?", "%"+filters.Name+"%")
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	page := filters.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := filters.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	var models []model.AuthUserModel
+	offset := (page - 1) * pageSize
+	if err := query.Order("created_at ASC").Offset(offset).Limit(pageSize).Find(&models).Error; err != nil {
+		return nil, 0, err
+	}
+
+	users := make([]*entity.AuthUser, len(models))
+	for i, m := range models {
+		users[i] = &entity.AuthUser{
+			ID:        m.ID,
+			Name:      m.Name,
+			Email:     m.Email,
+			Roles:     []string(m.Roles),
+			CreatedAt: m.CreatedAt,
+		}
+	}
+	return users, int(total), nil
+}

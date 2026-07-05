@@ -43,12 +43,12 @@ Identificar e remover arquivos/funcoes sem uso em runtime, incluindo casos usado
 
 ## Checklist de pronto
 
-- [ ] Inventario de uso documentado
-- [ ] Lista de remocoes com justificativa
-- [ ] Codigo/funcoes sem uso removidos
-- [ ] Testes obsoletos removidos e suite ajustada
-- [ ] Artefatos de desenvolvimento preservados
-- [ ] go test ./... verde
+- [x] Inventario de uso documentado
+- [x] Lista de remocoes com justificativa
+- [x] Codigo/funcoes sem uso removidos
+- [x] Testes obsoletos removidos e suite ajustada
+- [x] Artefatos de desenvolvimento preservados
+- [x] go test ./... verde
 
 ## Evidencias esperadas
 

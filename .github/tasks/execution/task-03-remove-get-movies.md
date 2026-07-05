@@ -32,11 +32,11 @@ Remover GET /api/v1/movies e eliminar codigo associado que ficar sem uso, preser
 
 ## Checklist de pronto
 
-- [ ] GET /api/v1/movies removido
-- [ ] GET /api/v1/movies/{id} mantido funcional
-- [ ] Sem referencias residuais no codigo runtime
-- [ ] Testes atualizados
-- [ ] go test ./... verde
+- [x] GET /api/v1/movies removido
+- [x] GET /api/v1/movies/{id} mantido funcional
+- [x] Sem referencias residuais no codigo runtime
+- [x] Testes atualizados
+- [x] go test ./... verde
 
 ## Evidencias esperadas
 

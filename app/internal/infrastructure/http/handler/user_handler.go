@@ -11,32 +11,39 @@ import (
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
+	cursorinfra "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/cursor"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 type UserHandler struct {
-	manageUserUC    domainusecase.ManageUserUseCase
-	suggestUC       domainusecase.SuggestMoviesUseCase
-	updateProfileUC domainusecase.UpdateUserProfileUseCase
-	authUserRepo    repository.AuthUserRepository
-	passwordService *auth.PasswordService
+	manageUserUC       domainusecase.ManageUserUseCase
+	suggestUC          domainusecase.SuggestMoviesUseCase
+	listUsersUC        domainusecase.ListUsersUseCase
+	authUserRepo       repository.AuthUserRepository
+	passwordService    *auth.PasswordService
+	cursorSecret       string
+	suggestionMaxLimit int
 }
 
 func NewUserHandler(
 	manageUserUC domainusecase.ManageUserUseCase,
 	suggestUC domainusecase.SuggestMoviesUseCase,
-	updateProfileUC domainusecase.UpdateUserProfileUseCase,
+	listUsersUC domainusecase.ListUsersUseCase,
 	authUserRepo repository.AuthUserRepository,
 	passwordService *auth.PasswordService,
+	cursorSecret string,
+	suggestionMaxLimit int,
 ) *UserHandler {
 	return &UserHandler{
-		manageUserUC:    manageUserUC,
-		suggestUC:       suggestUC,
-		updateProfileUC: updateProfileUC,
-		authUserRepo:    authUserRepo,
-		passwordService: passwordService,
+		manageUserUC:       manageUserUC,
+		suggestUC:          suggestUC,
+		listUsersUC:        listUsersUC,
+		authUserRepo:       authUserRepo,
+		passwordService:    passwordService,
+		cursorSecret:       cursorSecret,
+		suggestionMaxLimit: suggestionMaxLimit,
 	}
 }
 
@@ -132,6 +139,81 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(user)
 }
 
+type listUsersItem struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Email     string   `json:"email"`
+	Roles     []string `json:"roles"`
+	CreatedAt string   `json:"createdAt"`
+}
+
+type listUsersResponse struct {
+	Data     []listUsersItem `json:"data"`
+	Total    int             `json:"total"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"pageSize"`
+}
+
+func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	callerEmail, _ := r.Context().Value(middleware.ContextKeyUserEmail).(string)
+	roles, _ := r.Context().Value(middleware.ContextKeyRoles).([]string)
+
+	callerHasWrite := false
+	for _, role := range roles {
+		if role == "*" || role == "users:write" {
+			callerHasWrite = true
+			break
+		}
+	}
+
+	input := domainusecase.ListUsersInput{
+		Email: r.URL.Query().Get("email"),
+		Name:  r.URL.Query().Get("name"),
+	}
+
+	if v := r.URL.Query().Get("page"); v != "" {
+		p, err := strconv.Atoi(v)
+		if err != nil || p < 1 {
+			http.Error(w, "invalid page parameter", http.StatusBadRequest)
+			return
+		}
+		input.Page = p
+	}
+	if v := r.URL.Query().Get("pageSize"); v != "" {
+		ps, err := strconv.Atoi(v)
+		if err != nil || ps < 1 || ps > 100 {
+			http.Error(w, "invalid pageSize parameter (must be 1-100)", http.StatusBadRequest)
+			return
+		}
+		input.PageSize = ps
+	}
+
+	result, err := h.listUsersUC.Execute(r.Context(), callerEmail, callerHasWrite, input)
+	if err != nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]listUsersItem, len(result.Users))
+	for i, u := range result.Users {
+		items[i] = listUsersItem{
+			ID:        u.ID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Roles:     u.Roles,
+			CreatedAt: u.CreatedAt.Format(time.RFC3339),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(listUsersResponse{
+		Data:     items,
+		Total:    result.Total,
+		Page:     result.Page,
+		PageSize: result.PageSize,
+	})
+}
+
 func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 	email, _ := r.Context().Value(middleware.ContextKeyUserEmail).(string)
 	if email == "" {
@@ -139,10 +221,25 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limitStr := r.URL.Query().Get("limit")
-	limit := 0
-	if limitStr != "" {
-		limit, _ = strconv.Atoi(limitStr)
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil || parsedLimit < 1 || parsedLimit > 50 {
+			http.Error(w, "invalid limit parameter (must be 1-50)", http.StatusBadRequest)
+			return
+		}
+		limit = parsedLimit
+	}
+
+	offset := 0
+	cursorToken := r.URL.Query().Get("cursor")
+	if cursorToken != "" {
+		decodedCursor, err := cursorinfra.Decode(h.cursorSecret, cursorToken)
+		if err != nil {
+			http.Error(w, "invalid cursor", http.StatusBadRequest)
+			return
+		}
+		offset = decodedCursor.Offset
 	}
 
 	var algoOverride *entity.SuggestionAlgorithm
@@ -151,7 +248,7 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		algoOverride = &algo
 	}
 
-	movies, err := h.suggestUC.Execute(r.Context(), email, limit, algoOverride)
+	movies, err := h.suggestUC.Execute(r.Context(), email, h.suggestionMaxLimit, algoOverride)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
@@ -165,6 +262,15 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	total := len(movies)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+
 	type suggestionItem struct {
 		ID         string  `json:"id"`
 		Title      string  `json:"title"`
@@ -172,9 +278,10 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		Poster     string  `json:"poster"`
 		ImdbRating float64 `json:"imdbRating"`
 	}
-	result := make([]suggestionItem, len(movies))
-	for i, m := range movies {
-		result[i] = suggestionItem{
+	slicedMovies := movies[offset:end]
+	items := make([]suggestionItem, len(slicedMovies))
+	for i, m := range slicedMovies {
+		items[i] = suggestionItem{
 			ID:         m.ID,
 			Title:      m.Title,
 			Year:       m.Year,
@@ -182,6 +289,44 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 			ImdbRating: m.ImdbRating,
 		}
 	}
+
+	hasNext := end < total
+	hasPrev := offset > 0
+
+	var nextCursor *string
+	if hasNext {
+		encoded := cursorinfra.Encode(h.cursorSecret, cursorinfra.Cursor{Offset: end, Total: total})
+		nextCursor = &encoded
+	}
+
+	var prevCursor *string
+	if hasPrev {
+		prevOffset := offset - limit
+		if prevOffset < 0 {
+			prevOffset = 0
+		}
+		encoded := cursorinfra.Encode(h.cursorSecret, cursorinfra.Cursor{Offset: prevOffset, Total: total})
+		prevCursor = &encoded
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(struct {
+		Data       []suggestionItem `json:"data"`
+		NextCursor *string          `json:"nextCursor"`
+		PrevCursor *string          `json:"prevCursor"`
+		HasNext    bool             `json:"hasNext"`
+		HasPrev    bool             `json:"hasPrev"`
+		Limit      int              `json:"limit"`
+		Count      int              `json:"count"`
+		Total      int              `json:"total"`
+	}{
+		Data:       items,
+		NextCursor: nextCursor,
+		PrevCursor: prevCursor,
+		HasNext:    hasNext,
+		HasPrev:    hasPrev,
+		Limit:      limit,
+		Count:      len(items),
+		Total:      total,
+	})
 }

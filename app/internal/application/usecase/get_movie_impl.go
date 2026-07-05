@@ -19,7 +19,3 @@ func NewGetMovieUseCase(movieRepo repository.MovieRepository) domainusecase.GetM
 func (uc *getMovieUseCase) GetByID(ctx context.Context, id string) (*entity.Movie, error) {
 	return uc.movieRepo.FindByID(ctx, id)
 }
-
-func (uc *getMovieUseCase) ListMovies(ctx context.Context, page, limit int) ([]*entity.Movie, int, error) {
-	return uc.movieRepo.FindAll(ctx, page, limit)
-}

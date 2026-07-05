@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
 )
 
@@ -17,6 +18,9 @@ type mockAuthUserRepository struct {
 func (m *mockAuthUserRepository) Create(ctx context.Context, user *entity.AuthUser) error { return nil }
 func (m *mockAuthUserRepository) FindByEmail(ctx context.Context, email string) (*entity.AuthUser, error) {
 	return m.user, m.err
+}
+func (m *mockAuthUserRepository) List(ctx context.Context, filters repository.AuthUserFilters) ([]*entity.AuthUser, int, error) {
+	return nil, 0, nil
 }
 
 func TestLoginUseCase_Execute(t *testing.T) {

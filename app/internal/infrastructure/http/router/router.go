@@ -34,9 +34,10 @@ func NewRouter(
 
 			r.With(middleware.RequireRole("users:read"), middleware.RequireOwnerOrWildcard()).Get("/users/{id}", userHandler.GetUser)
 
+			r.With(middleware.RequireRole("users:read")).Get("/users", userHandler.ListUsers)
+
 			r.With(middleware.RequireRole("suggestions:read")).Get("/suggestions", userHandler.GetSuggestions)
 
-			r.With(middleware.RequireRole("movies:read")).Get("/movies", movieHandler.ListMovies)
 			r.With(middleware.RequireRole("movies:read")).Get("/movies/{id}", movieHandler.GetMovie)
 			r.With(middleware.RequireRole("movies-watch:write")).Post("/movies/{id}/watched", movieHandler.RecordWatched)
 

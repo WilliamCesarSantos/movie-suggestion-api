@@ -1,6 +1,6 @@
 # EXE-02 - Paginacao cursor-based em /suggestions
 
-Status: TODO
+Status: DONE
 Prioridade: ALTA
 Dependencias: EXE-01 recomendada
 Bloqueia: EXE-03, EXE-04, EXE-05
@@ -45,15 +45,15 @@ Atualizar GET /api/v1/suggestions para paginacao cursor-based com cursor opaco a
 
 ## Checklist de pronto
 
-- [ ] /suggestions suporta cursor + limit
-- [ ] Cursor opaco assinado implementado
-- [ ] Metadados completos no response
-- [ ] Ordenacao estavel validada
-- [ ] Testes cobrindo cenarios principais
-- [ ] go test ./... verde
+- [x] /suggestions suporta cursor + limit
+- [x] Cursor opaco assinado implementado
+- [x] Metadados completos no response
+- [x] Ordenacao estavel validada
+- [x] Testes cobrindo cenarios principais
+- [x] go test ./... verde
 
 ## Evidencias esperadas
 
-- Exemplo de duas paginas consecutivas
-- Comprovacao de hasNext/hasPrev
-- Resultado dos testes
+- Primeira pagina (`limit=2`): `count=2`, `total=3`, `hasNext=true`, `hasPrev=false`, `nextCursor!=null`, `prevCursor=null`
+- Segunda pagina (`limit=2` + cursor de offset 2): `count=1`, `hasNext=false`, `hasPrev=true`, `nextCursor=null`, `prevCursor!=null`
+- Testes automatizados: `go test ./...`
