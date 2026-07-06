@@ -14,7 +14,7 @@ Definicoes consolidadas:
   - Filtros desta entrega: email exato, name (contains), page/pageSize.
   - Filtros sao opcionais.
 - Tarefa 2:
-  - Paginacao de /suggestions: cursor-based.
+  - Paginacao de /recommendations: cursor-based.
   - Cursor: opaco assinado.
   - Metadados de resposta: data, nextCursor, prevCursor, hasNext, hasPrev, limit, count, total.
   - Ordenacao: manter ranking atual e usar id asc apenas para desempate.
@@ -41,7 +41,7 @@ Pendencias de clarify:
 Arquivos de execucao gerados em .github/tasks/execution:
 - README.md
 - task-01-list-users.md
-- task-02-suggestions-pagination.md
+- task-02-recommendations-pagination.md
 - task-03-remove-get-movies.md
 - task-04-openapi-update.md
 - task-05-unused-code-cleanup.md
@@ -71,13 +71,13 @@ Criterios de aceite:
 - Sem permissao users:read/users:write retorna 403.
 - Testes unitarios e de integracao cobrindo os cenarios.
 
-## Tarefa 2 - Paginacao no endpoint de suggestions
+## Tarefa 2 - Paginacao no endpoint de recommendations
 
 Status: PENDENTE
 Prioridade: ALTA
 
 Descricao:
-- Atualizar GET /api/v1/suggestions para suportar paginacao.
+- Atualizar GET /api/v1/recommendations para suportar paginacao.
 
 Escopo tecnico inicial:
 - Definir contrato de paginacao (page, pageSize) ou cursor.
@@ -120,7 +120,7 @@ Descricao:
 Escopo tecnico inicial:
 - Ajustar especificacao em openapi.yaml (caminhos, schemas, seguranca, respostas).
 - Documentar endpoint de listagem de usuarios e regra por perfil.
-- Documentar paginacao de suggestions.
+- Documentar paginacao de recommendations.
 - Remover operacao de GET /movies.
 
 Criterios de aceite:

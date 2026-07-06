@@ -36,11 +36,11 @@ func (uc *integrationLoginUseCase) Execute(ctx context.Context, email, password 
 	}, nil
 }
 
-type integrationSuggestMoviesUseCase struct {
+type integrationRecommendMoviesUseCase struct {
 	receivedEmail string
 }
 
-func (uc *integrationSuggestMoviesUseCase) Execute(ctx context.Context, userEmail string, limit int, algorithmOverride *entity.SuggestionAlgorithm) ([]*entity.Movie, error) {
+func (uc *integrationRecommendMoviesUseCase) Execute(ctx context.Context, userEmail string, limit int, algorithmOverride *entity.RecommendationAlgorithm, title string) ([]*entity.Movie, error) {
 	uc.receivedEmail = userEmail
 	return []*entity.Movie{{
 		ID:         "movie-1",
@@ -65,27 +65,27 @@ func (uc *integrationManageUserUseCase) RecordWatched(ctx context.Context, userI
 	return nil, nil
 }
 
-func TestIntegration_LoginThenSuggestions_UsesEmailFromToken(t *testing.T) {
+func TestIntegration_LoginThenMoviesRecommendations_UsesEmailFromToken(t *testing.T) {
 	const expectedEmail = "william_cesar_santos@hotmail.com"
 
 	jwtService := auth.NewJWTService("integration-secret", 1)
 	loginUC := &integrationLoginUseCase{
 		jwtService: jwtService,
 		email:      expectedEmail,
-		roles:      []string{"suggestions:read"},
+		roles:      []string{"movies:read"},
 	}
-	suggestUC := &integrationSuggestMoviesUseCase{}
+	recommendUC := &integrationRecommendMoviesUseCase{}
 	manageUC := &integrationManageUserUseCase{}
 
 	authHandler := handler.NewAuthHandler(loginUC)
-	userHandler := handler.NewUserHandler(manageUC, suggestUC, nil, nil, nil, nil, "integration-secret", 50)
+	userHandler := handler.NewUserHandler(manageUC, recommendUC, nil, nil, nil, nil, "integration-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()
 	r.Post("/api/v1/login", authHandler.Login)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(authMiddleware.Authenticate)
-		r.With(middleware.RequireRole("suggestions:read")).Get("/suggestions", userHandler.GetSuggestions)
+		r.With(middleware.RequireAnyRole("movies:read", "movies:write")).Get("/movies", userHandler.GetRecommendedMovies)
 	})
 
 	loginBody := map[string]string{
@@ -130,25 +130,25 @@ func TestIntegration_LoginThenSuggestions_UsesEmailFromToken(t *testing.T) {
 		t.Fatalf("expected token with future expiration, got %#v", claims.ExpiresAt)
 	}
 
-	suggestionsReq := httptest.NewRequest(http.MethodGet, "/api/v1/suggestions", nil)
-	suggestionsReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
-	suggestionsRec := httptest.NewRecorder()
-	r.ServeHTTP(suggestionsRec, suggestionsReq)
+	moviesReq := httptest.NewRequest(http.MethodGet, "/api/v1/movies", nil)
+	moviesReq.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	moviesRec := httptest.NewRecorder()
+	r.ServeHTTP(moviesRec, moviesReq)
 
-	if suggestionsRec.Code != http.StatusOK {
-		t.Fatalf("expected suggestions status 200, got %d body=%s", suggestionsRec.Code, suggestionsRec.Body.String())
+	if moviesRec.Code != http.StatusOK {
+		t.Fatalf("expected movies status 200, got %d body=%s", moviesRec.Code, moviesRec.Body.String())
 	}
-	if suggestUC.receivedEmail != expectedEmail {
-		t.Fatalf("expected suggest use case to receive email %s, got %s", expectedEmail, suggestUC.receivedEmail)
+	if recommendUC.receivedEmail != expectedEmail {
+		t.Fatalf("expected recommend use case to receive email %s, got %s", expectedEmail, recommendUC.receivedEmail)
 	}
 
-	var suggestionsResp struct {
+	var moviesResp struct {
 		Data []map[string]any `json:"data"`
 	}
-	if err := json.Unmarshal(suggestionsRec.Body.Bytes(), &suggestionsResp); err != nil {
-		t.Fatalf("json.Unmarshal(suggestions response) error = %v", err)
+	if err := json.Unmarshal(moviesRec.Body.Bytes(), &moviesResp); err != nil {
+		t.Fatalf("json.Unmarshal(movies response) error = %v", err)
 	}
-	if len(suggestionsResp.Data) != 1 {
-		t.Fatalf("expected 1 suggested movie, got %d", len(suggestionsResp.Data))
+	if len(moviesResp.Data) != 1 {
+		t.Fatalf("expected 1 recommended movie, got %d", len(moviesResp.Data))
 	}
 }

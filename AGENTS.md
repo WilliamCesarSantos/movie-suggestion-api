@@ -29,7 +29,7 @@ Este arquivo resume o contexto essencial do projeto para agentes, reduzindo busc
   - userId
   - userEmail
   - roles
-- Foi adicionado teste de integracao para fluxo login -> suggestions validando uso do email do token.
+- Foi adicionado teste de integracao para fluxo login -> recommendations validando uso do email do token.
 
 ## Decisoes refinadas (fonte de verdade)
 
@@ -37,7 +37,7 @@ Arquivos de planejamento:
 - .github/tasks/refinement-backlog.md
 - .github/tasks/execution/README.md
 - .github/tasks/execution/task-01-list-users.md
-- .github/tasks/execution/task-02-suggestions-pagination.md
+- .github/tasks/execution/task-02-recommendations-pagination.md
 - .github/tasks/execution/task-03-remove-get-movies.md
 - .github/tasks/execution/task-04-openapi-update.md
 - .github/tasks/execution/task-05-unused-code-cleanup.md
@@ -45,7 +45,7 @@ Arquivos de planejamento:
 
 Resumo das decisoes de clarify:
 - Novo GET /api/v1/users com regra por role (users:read apenas ve a si mesmo).
-- /suggestions com paginacao cursor-based e cursor opaco assinado.
+- /recommendations com paginacao cursor-based e cursor opaco assinado.
 - Remover GET /api/v1/movies.
 - Atualizar somente openapi.yaml para refletir mudancas.
 - Limpeza de codigo sem uso inclui itens usados apenas por testes (preservar artefatos de desenvolvimento).

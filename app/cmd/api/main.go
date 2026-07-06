@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/config"
-	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/recommendation"
 	appusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
@@ -97,8 +97,8 @@ func provideUserRepo(driver neo4j.DriverWithContext, cfg *config.Config) reposit
 	return neo4jinfra.NewUserRepository(driver, cfg.Neo4j.Database)
 }
 
-func provideSuggestionRepo(driver neo4j.DriverWithContext, cfg *config.Config) repository.SuggestionRepository {
-	return neo4jinfra.NewSuggestionRepository(driver, cfg.Neo4j.Database)
+func provideRecommendationRepo(driver neo4j.DriverWithContext, cfg *config.Config) repository.RecommendationRepository {
+	return neo4jinfra.NewRecommendationRepository(driver, cfg.Neo4j.Database)
 }
 
 func provideAuthUserRepo(db *gorm.DB) repository.AuthUserRepository {
@@ -127,33 +127,33 @@ func provideSQSPublisher(client *awssqs.Client, cfg *config.Config) domainusecas
 
 // Application
 
-func provideAlgorithmSelector(cfg *config.Config) *suggestion.AlgorithmSelector {
-	return suggestion.NewAlgorithmSelector(
-		cfg.Suggestion.ContentPreferenceThreshold,
-		cfg.Suggestion.CollaborativeMinWatches,
-		cfg.Suggestion.ContentBasedMinWatches,
+func provideAlgorithmSelector(cfg *config.Config) *recommendation.AlgorithmSelector {
+	return recommendation.NewAlgorithmSelector(
+		cfg.Recommendation.ContentPreferenceThreshold,
+		cfg.Recommendation.CollaborativeMinWatches,
+		cfg.Recommendation.ContentBasedMinWatches,
 	)
 }
 
-func provideAlgorithmDispatcher(repo repository.SuggestionRepository) *suggestion.AlgorithmDispatcher {
-	return suggestion.NewAlgorithmDispatcher(repo)
+func provideAlgorithmDispatcher(repo repository.RecommendationRepository) *recommendation.AlgorithmDispatcher {
+	return recommendation.NewAlgorithmDispatcher(repo)
 }
 
-func provideSuggestUseCase(
+func provideRecommendUseCase(
 	userRepo repository.UserRepository,
-	suggestionRepo repository.SuggestionRepository,
-	selector *suggestion.AlgorithmSelector,
-	dispatcher *suggestion.AlgorithmDispatcher,
+	recommendationRepo repository.RecommendationRepository,
+	selector *recommendation.AlgorithmSelector,
+	dispatcher *recommendation.AlgorithmDispatcher,
 	cfg *config.Config,
-) domainusecase.SuggestMoviesUseCase {
-	return appusecase.NewSuggestMoviesUseCase(userRepo, suggestionRepo, selector, dispatcher, cfg.Suggestion)
+) domainusecase.RecommendMoviesUseCase {
+	return appusecase.NewRecommendMoviesUseCase(userRepo, recommendationRepo, selector, dispatcher, cfg.Recommendation)
 }
 
 func provideImportUseCase(searcher domainusecase.OmdbSearcher, publisher domainusecase.MovieImportPublisher) domainusecase.ImportMoviesUseCase {
 	return appusecase.NewImportMoviesUseCase(searcher, publisher)
 }
 
-func provideManageUserUseCase(repo repository.UserRepository, selector *suggestion.AlgorithmSelector) domainusecase.ManageUserUseCase {
+func provideManageUserUseCase(repo repository.UserRepository, selector *recommendation.AlgorithmSelector) domainusecase.ManageUserUseCase {
 	return appusecase.NewManageUserUseCase(repo, selector)
 }
 
@@ -181,14 +181,14 @@ func provideLoginUseCase(repo repository.AuthUserRepository, ps *auth.PasswordSe
 
 func provideUserHandler(
 	manageUC domainusecase.ManageUserUseCase,
-	suggestUC domainusecase.SuggestMoviesUseCase,
+	recommendUC domainusecase.RecommendMoviesUseCase,
 	listUsersUC domainusecase.ListUsersUseCase,
 	patchUserUC domainusecase.PatchUserUseCase,
 	authRepo repository.AuthUserRepository,
 	ps *auth.PasswordService,
 	cfg *config.Config,
 ) *handler.UserHandler {
-	return handler.NewUserHandler(manageUC, suggestUC, listUsersUC, patchUserUC, authRepo, ps, cfg.Auth.Secret, cfg.Suggestion.MaxLimit)
+	return handler.NewUserHandler(manageUC, recommendUC, listUsersUC, patchUserUC, authRepo, ps, cfg.Auth.Secret, cfg.Recommendation.MaxLimit)
 }
 
 func provideMovieHandler(getUC domainusecase.GetMovieUseCase, manageUC domainusecase.ManageUserUseCase) *handler.MovieHandler {
@@ -335,7 +335,7 @@ var infrastructureModule = fx.Module("infrastructure",
 		provideMetrics,
 		provideMovieRepo,
 		provideUserRepo,
-		provideSuggestionRepo,
+		provideRecommendationRepo,
 		provideAuthUserRepo,
 		provideOMDBClient,
 		provideOMDBSearcher,
@@ -349,7 +349,7 @@ var applicationModule = fx.Module("application",
 	fx.Provide(
 		provideAlgorithmSelector,
 		provideAlgorithmDispatcher,
-		provideSuggestUseCase,
+		provideRecommendUseCase,
 		provideImportUseCase,
 		provideManageUserUseCase,
 		provideProcessImportUseCase,

@@ -15,7 +15,6 @@ import (
 var allowedPatchRoles = map[string]struct{}{
 	"users:read":         {},
 	"users:write":        {},
-	"suggestions:read":   {},
 	"movies:read":        {},
 	"movies-watch:write": {},
 	"movies:write":       {},

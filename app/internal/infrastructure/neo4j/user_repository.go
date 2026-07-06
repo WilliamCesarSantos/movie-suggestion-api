@@ -149,7 +149,7 @@ func recordToUser(record *neo4j.Record) (*entity.User, error) {
 		u.Email, _ = v.(string)
 	}
 	if v, ok := node.Props["currentAlgorithm"]; ok {
-		u.CurrentAlgorithm = entity.SuggestionAlgorithm(v.(string))
+		u.CurrentAlgorithm = entity.RecommendationAlgorithm(v.(string))
 	}
 	if v, ok := node.Props["watchCount"]; ok {
 		if wc, ok2 := v.(int64); ok2 {

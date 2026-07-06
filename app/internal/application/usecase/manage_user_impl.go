@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/recommendation"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
@@ -13,10 +13,10 @@ import (
 
 type manageUserUseCase struct {
 	userRepo repository.UserRepository
-	selector *suggestion.AlgorithmSelector
+	selector *recommendation.AlgorithmSelector
 }
 
-func NewManageUserUseCase(userRepo repository.UserRepository, selector *suggestion.AlgorithmSelector) domainusecase.ManageUserUseCase {
+func NewManageUserUseCase(userRepo repository.UserRepository, selector *recommendation.AlgorithmSelector) domainusecase.ManageUserUseCase {
 	return &manageUserUseCase{userRepo: userRepo, selector: selector}
 }
 

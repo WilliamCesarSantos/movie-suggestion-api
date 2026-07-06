@@ -28,8 +28,8 @@ func (s *stubListUsersUC) Execute(ctx context.Context, callerEmail string, calle
 
 func buildListUsersRouter(jwtService *auth.JWTService, listUC domainusecase.ListUsersUseCase) *chi.Mux {
 	manageUC := &integrationManageUserUseCase{}
-	suggestUC := &integrationSuggestMoviesUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, listUC, nil, nil, nil, "test-secret", 50)
+	recommendUC := &integrationRecommendMoviesUseCase{}
+	h := handler.NewUserHandler(manageUC, recommendUC, listUC, nil, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()
@@ -89,7 +89,7 @@ func TestListUsers_ReadOnly_ReturnsSelf(t *testing.T) {
 
 func TestListUsers_NoRole_Returns403(t *testing.T) {
 	jwtService := auth.NewJWTService("test-secret", 1)
-	token, _, err := jwtService.Generate("user-id-2", "bob@example.com", []string{"suggestions:read"})
+	token, _, err := jwtService.Generate("user-id-2", "bob@example.com", []string{"movies:read"})
 	if err != nil {
 		t.Fatalf("token generation failed: %v", err)
 	}

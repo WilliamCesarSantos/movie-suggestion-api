@@ -1,4 +1,4 @@
-package suggestion
+package recommendation
 
 import "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 
@@ -16,7 +16,7 @@ func NewAlgorithmSelector(contentPreferenceThreshold float64, collaborativeMinWa
 	}
 }
 
-func (s *AlgorithmSelector) Select(user entity.User) entity.SuggestionAlgorithm {
+func (s *AlgorithmSelector) Select(user entity.User) entity.RecommendationAlgorithm {
 	if user.WatchCount < s.contentBasedMinWatches {
 		return entity.AlgorithmPopular
 	}

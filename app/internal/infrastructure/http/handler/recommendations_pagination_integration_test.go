@@ -15,61 +15,63 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-type paginationSuggestMoviesUseCase struct {
+type paginationRecommendMoviesUseCase struct {
 	movies        []*entity.Movie
 	receivedEmail string
 	receivedLimit int
-	receivedAlgo  *entity.SuggestionAlgorithm
+	receivedAlgo  *entity.RecommendationAlgorithm
+	receivedTitle string
 }
 
-func (uc *paginationSuggestMoviesUseCase) Execute(ctx context.Context, userEmail string, limit int, algorithmOverride *entity.SuggestionAlgorithm) ([]*entity.Movie, error) {
+func (uc *paginationRecommendMoviesUseCase) Execute(ctx context.Context, userEmail string, limit int, algorithmOverride *entity.RecommendationAlgorithm, title string) ([]*entity.Movie, error) {
 	uc.receivedEmail = userEmail
 	uc.receivedLimit = limit
 	uc.receivedAlgo = algorithmOverride
+	uc.receivedTitle = title
 	return uc.movies, nil
 }
 
-func buildSuggestionsRouter(jwtService *auth.JWTService, suggestUC *paginationSuggestMoviesUseCase) *chi.Mux {
+func buildMoviesRecommendationsRouter(jwtService *auth.JWTService, recommendUC *paginationRecommendMoviesUseCase) *chi.Mux {
 	manageUC := &integrationManageUserUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, nil, nil, nil, nil, "test-secret", 50)
+	h := handler.NewUserHandler(manageUC, recommendUC, nil, nil, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(authMiddleware.Authenticate)
-		r.With(middleware.RequireRole("suggestions:read")).Get("/suggestions", h.GetSuggestions)
+		r.With(middleware.RequireAnyRole("movies:read", "movies:write")).Get("/movies", h.GetRecommendedMovies)
 	})
 	return r
 }
 
-func suggestionsAuthHeader(t *testing.T, jwtService *auth.JWTService) string {
+func moviesAuthHeader(t *testing.T, jwtService *auth.JWTService) string {
 	t.Helper()
-	token, _, err := jwtService.Generate("user-id", "alice@example.com", []string{"suggestions:read"})
+	token, _, err := jwtService.Generate("user-id", "alice@example.com", []string{"movies:read"})
 	if err != nil {
 		t.Fatalf("token generation failed: %v", err)
 	}
 	return "Bearer " + token
 }
 
-func TestGetSuggestions_FirstPageReturnsPaginationMetadata(t *testing.T) {
+func TestGetMoviesRecommendations_FirstPageReturnsPaginationMetadata(t *testing.T) {
 	jwtService := auth.NewJWTService("test-secret", 1)
-	suggestUC := &paginationSuggestMoviesUseCase{movies: []*entity.Movie{
+	recommendUC := &paginationRecommendMoviesUseCase{movies: []*entity.Movie{
 		{ID: "movie-1", Title: "Movie 1", Year: "2024", Poster: "p1", ImdbRating: 7.1},
 		{ID: "movie-2", Title: "Movie 2", Year: "2023", Poster: "p2", ImdbRating: 7.2},
 		{ID: "movie-3", Title: "Movie 3", Year: "2022", Poster: "p3", ImdbRating: 7.3},
 	}}
-	r := buildSuggestionsRouter(jwtService, suggestUC)
+	r := buildMoviesRecommendationsRouter(jwtService, recommendUC)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/suggestions?limit=2", nil)
-	req.Header.Set("Authorization", suggestionsAuthHeader(t, jwtService))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/movies?limit=2", nil)
+	req.Header.Set("Authorization", moviesAuthHeader(t, jwtService))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
-	if suggestUC.receivedLimit != 50 {
-		t.Fatalf("expected use case limit 50, got %d", suggestUC.receivedLimit)
+	if recommendUC.receivedLimit != 50 {
+		t.Fatalf("expected use case limit 50, got %d", recommendUC.receivedLimit)
 	}
 
 	var resp struct {
@@ -99,18 +101,18 @@ func TestGetSuggestions_FirstPageReturnsPaginationMetadata(t *testing.T) {
 	}
 }
 
-func TestGetSuggestions_NextPageReturnsPrevCursor(t *testing.T) {
+func TestGetMoviesRecommendations_NextPageReturnsPrevCursor(t *testing.T) {
 	jwtService := auth.NewJWTService("test-secret", 1)
-	suggestUC := &paginationSuggestMoviesUseCase{movies: []*entity.Movie{
+	recommendUC := &paginationRecommendMoviesUseCase{movies: []*entity.Movie{
 		{ID: "movie-1", Title: "Movie 1"},
 		{ID: "movie-2", Title: "Movie 2"},
 		{ID: "movie-3", Title: "Movie 3"},
 	}}
-	r := buildSuggestionsRouter(jwtService, suggestUC)
+	r := buildMoviesRecommendationsRouter(jwtService, recommendUC)
 
 	cursor := cursorinfra.Encode("test-secret", cursorinfra.Cursor{Offset: 2, Total: 3})
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/suggestions?limit=2&cursor="+cursor, nil)
-	req.Header.Set("Authorization", suggestionsAuthHeader(t, jwtService))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/movies?limit=2&cursor="+cursor, nil)
+	req.Header.Set("Authorization", moviesAuthHeader(t, jwtService))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -143,13 +145,13 @@ func TestGetSuggestions_NextPageReturnsPrevCursor(t *testing.T) {
 	}
 }
 
-func TestGetSuggestions_InvalidCursorReturnsBadRequest(t *testing.T) {
+func TestGetMoviesRecommendations_InvalidCursorReturnsBadRequest(t *testing.T) {
 	jwtService := auth.NewJWTService("test-secret", 1)
-	suggestUC := &paginationSuggestMoviesUseCase{movies: []*entity.Movie{}}
-	r := buildSuggestionsRouter(jwtService, suggestUC)
+	recommendUC := &paginationRecommendMoviesUseCase{movies: []*entity.Movie{}}
+	r := buildMoviesRecommendationsRouter(jwtService, recommendUC)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/suggestions?cursor=invalid", nil)
-	req.Header.Set("Authorization", suggestionsAuthHeader(t, jwtService))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/movies?cursor=invalid", nil)
+	req.Header.Set("Authorization", moviesAuthHeader(t, jwtService))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
@@ -158,17 +160,55 @@ func TestGetSuggestions_InvalidCursorReturnsBadRequest(t *testing.T) {
 	}
 }
 
-func TestGetSuggestions_InvalidLimitReturnsBadRequest(t *testing.T) {
+func TestGetMoviesRecommendations_InvalidLimitReturnsBadRequest(t *testing.T) {
 	jwtService := auth.NewJWTService("test-secret", 1)
-	suggestUC := &paginationSuggestMoviesUseCase{movies: []*entity.Movie{}}
-	r := buildSuggestionsRouter(jwtService, suggestUC)
+	recommendUC := &paginationRecommendMoviesUseCase{movies: []*entity.Movie{}}
+	r := buildMoviesRecommendationsRouter(jwtService, recommendUC)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/suggestions?limit=0", nil)
-	req.Header.Set("Authorization", suggestionsAuthHeader(t, jwtService))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/movies?limit=0", nil)
+	req.Header.Set("Authorization", moviesAuthHeader(t, jwtService))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetMoviesRecommendations_TitleFilterIsPassedThrough(t *testing.T) {
+	jwtService := auth.NewJWTService("test-secret", 1)
+	recommendUC := &paginationRecommendMoviesUseCase{movies: []*entity.Movie{{ID: "movie-1", Title: "Matrix"}}}
+	r := buildMoviesRecommendationsRouter(jwtService, recommendUC)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/movies?title=mat", nil)
+	req.Header.Set("Authorization", moviesAuthHeader(t, jwtService))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if recommendUC.receivedTitle != "mat" {
+		t.Fatalf("expected title filter 'mat', got %q", recommendUC.receivedTitle)
+	}
+}
+
+func TestGetMoviesRecommendations_WithoutMoviesReadOrWriteReturnsForbidden(t *testing.T) {
+	jwtService := auth.NewJWTService("test-secret", 1)
+	recommendUC := &paginationRecommendMoviesUseCase{movies: []*entity.Movie{}}
+	r := buildMoviesRecommendationsRouter(jwtService, recommendUC)
+
+	token, _, err := jwtService.Generate("user-id", "alice@example.com", []string{"users:read"})
+	if err != nil {
+		t.Fatalf("token generation failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/movies", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
