@@ -187,6 +187,54 @@ paths:
           $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [Users]
+      summary: Patch user
+      description: >
+        Updates user fields (`name`, `password`, `roles`) with partial payload.
+        Requires `users:write` role (or wildcard `*`).
+
+        **Field ownership rules:**
+        - Owner (token subject equals path `id`) can update `name`, `password`, and `roles`.
+        - Non-owner can update only `roles`.
+        - Non-owner attempting to update `name` or `password` receives `403`.
+
+        **Roles rules:**
+        - Replaces the entire roles list when provided.
+        - Empty list is allowed.
+        - Roles must belong to the fixed allowlist:
+          `users:read`, `users:write`, `suggestions:read`, `movies:read`, `movies-watch:write`, `movies:write`.
+
+        **Password rule:**
+        - Minimum 6 characters.
+      operationId: patchUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchUserRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatchUserResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   /api/v1/suggestions:
     get:
@@ -501,6 +549,55 @@ components:
         name:
           type: string
           example: Alice
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["users:read", "movies:read"]
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-30T12:00:00Z"
+
+    PatchUserRequest:
+      type: object
+      description: Partial user update payload. At least one field must be provided.
+      properties:
+        name:
+          type: string
+          example: Alice Updated
+        password:
+          type: string
+          format: password
+          minLength: 6
+          example: "123456"
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+              - users:read
+              - users:write
+              - suggestions:read
+              - movies:read
+              - movies-watch:write
+              - movies:write
+          example: ["users:read", "movies:read"]
+
+    PatchUserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 90b4fd08-ee46-4d54-a7c0-1bab4857cec3
+        name:
+          type: string
+          example: Alice Updated
         email:
           type: string
           format: email

@@ -31,7 +31,7 @@ func (uc *paginationSuggestMoviesUseCase) Execute(ctx context.Context, userEmail
 
 func buildSuggestionsRouter(jwtService *auth.JWTService, suggestUC *paginationSuggestMoviesUseCase) *chi.Mux {
 	manageUC := &integrationManageUserUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, nil, nil, nil, "test-secret", 50)
+	h := handler.NewUserHandler(manageUC, suggestUC, nil, nil, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()

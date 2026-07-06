@@ -78,7 +78,7 @@ func TestIntegration_LoginThenSuggestions_UsesEmailFromToken(t *testing.T) {
 	manageUC := &integrationManageUserUseCase{}
 
 	authHandler := handler.NewAuthHandler(loginUC)
-	userHandler := handler.NewUserHandler(manageUC, suggestUC, nil, nil, nil, "integration-secret", 50)
+	userHandler := handler.NewUserHandler(manageUC, suggestUC, nil, nil, nil, nil, "integration-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()

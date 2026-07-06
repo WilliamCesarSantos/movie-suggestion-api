@@ -38,6 +38,24 @@ func (r *authUserRepository) Create(ctx context.Context, user *entity.AuthUser) 
 	return nil
 }
 
+func (r *authUserRepository) FindByID(ctx context.Context, id string) (*entity.AuthUser, error) {
+	var m model.AuthUserModel
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, entity.ErrAuthUserNotFound
+		}
+		return nil, err
+	}
+	return &entity.AuthUser{
+		ID:        m.ID,
+		Name:      m.Name,
+		Email:     m.Email,
+		Password:  m.Password,
+		Roles:     []string(m.Roles),
+		CreatedAt: m.CreatedAt,
+	}, nil
+}
+
 func (r *authUserRepository) FindByEmail(ctx context.Context, email string) (*entity.AuthUser, error) {
 	var m model.AuthUserModel
 	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&m).Error; err != nil {
@@ -99,4 +117,30 @@ func (r *authUserRepository) List(ctx context.Context, filters repository.AuthUs
 		}
 	}
 	return users, int(total), nil
+}
+
+func (r *authUserRepository) Update(ctx context.Context, id string, update repository.AuthUserUpdate) error {
+	updates := map[string]any{}
+	if update.Name != nil {
+		updates["name"] = *update.Name
+	}
+	if update.Password != nil {
+		updates["password"] = *update.Password
+	}
+	if update.Roles != nil {
+		updates["roles"] = pq.StringArray(*update.Roles)
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	res := r.db.WithContext(ctx).Model(&model.AuthUserModel{}).Where("id = ?", id).Updates(updates)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return entity.ErrAuthUserNotFound
+	}
+	return nil
 }

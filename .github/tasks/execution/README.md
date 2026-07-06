@@ -19,6 +19,7 @@ Este diretorio contem a quebra do arquivo de refinamento em tarefas executaveis 
 - EXE-04: task-04-openapi-update.md
 - EXE-05: task-05-unused-code-cleanup.md
 - EXE-06: task-06-logging-correlation-pod.md
+- EXE-07: task-07-users-patch-update.md
 
 ## Regras gerais
 

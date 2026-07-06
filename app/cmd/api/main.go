@@ -169,6 +169,10 @@ func provideListUsersUseCase(repo repository.AuthUserRepository) domainusecase.L
 	return appusecase.NewListUsersUseCase(repo)
 }
 
+func providePatchUserUseCase(authRepo repository.AuthUserRepository, userRepo repository.UserRepository, ps *auth.PasswordService) domainusecase.PatchUserUseCase {
+	return appusecase.NewPatchUserUseCase(authRepo, userRepo, ps)
+}
+
 func provideLoginUseCase(repo repository.AuthUserRepository, ps *auth.PasswordService, js *auth.JWTService) domainusecase.LoginUseCase {
 	return appusecase.NewLoginUseCase(repo, ps, js)
 }
@@ -179,11 +183,12 @@ func provideUserHandler(
 	manageUC domainusecase.ManageUserUseCase,
 	suggestUC domainusecase.SuggestMoviesUseCase,
 	listUsersUC domainusecase.ListUsersUseCase,
+	patchUserUC domainusecase.PatchUserUseCase,
 	authRepo repository.AuthUserRepository,
 	ps *auth.PasswordService,
 	cfg *config.Config,
 ) *handler.UserHandler {
-	return handler.NewUserHandler(manageUC, suggestUC, listUsersUC, authRepo, ps, cfg.Auth.Secret, cfg.Suggestion.MaxLimit)
+	return handler.NewUserHandler(manageUC, suggestUC, listUsersUC, patchUserUC, authRepo, ps, cfg.Auth.Secret, cfg.Suggestion.MaxLimit)
 }
 
 func provideMovieHandler(getUC domainusecase.GetMovieUseCase, manageUC domainusecase.ManageUserUseCase) *handler.MovieHandler {
@@ -351,6 +356,7 @@ var applicationModule = fx.Module("application",
 		provideGetMovieUseCase,
 		provideLoginUseCase,
 		provideListUsersUseCase,
+		providePatchUserUseCase,
 	),
 )
 
