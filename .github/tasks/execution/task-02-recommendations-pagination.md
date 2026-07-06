@@ -1,4 +1,4 @@
-# EXE-02 - Paginacao cursor-based em /suggestions
+# EXE-02 - Paginacao cursor-based em /recommendations
 
 Status: DONE
 Prioridade: ALTA
@@ -7,7 +7,7 @@ Bloqueia: EXE-03, EXE-04, EXE-05
 
 ## Objetivo
 
-Atualizar GET /api/v1/suggestions para paginacao cursor-based com cursor opaco assinado, preservando ranking atual e usando id asc apenas como desempate.
+Atualizar GET /api/v1/recommendations para paginacao cursor-based com cursor opaco assinado, preservando ranking atual e usando id asc apenas como desempate.
 
 ## Entradas do Clarify
 
@@ -45,7 +45,7 @@ Atualizar GET /api/v1/suggestions para paginacao cursor-based com cursor opaco a
 
 ## Checklist de pronto
 
-- [x] /suggestions suporta cursor + limit
+- [x] /recommendations suporta cursor + limit
 - [x] Cursor opaco assinado implementado
 - [x] Metadados completos no response
 - [x] Ordenacao estavel validada

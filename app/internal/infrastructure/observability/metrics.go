@@ -8,7 +8,7 @@ import (
 type Metrics struct {
 	HttpRequestsTotal    *prometheus.CounterVec
 	HttpRequestDuration  *prometheus.HistogramVec
-	SuggestionsTotal     *prometheus.CounterVec
+	RecommendationsTotal *prometheus.CounterVec
 	MovieImportTotal     *prometheus.CounterVec
 	SqsMessagesProcessed *prometheus.CounterVec
 	OmdbRequestDuration  *prometheus.HistogramVec
@@ -28,9 +28,9 @@ func NewMetrics() *Metrics {
 			Buckets: prometheus.DefBuckets,
 		}, []string{"method", "path"}),
 
-		SuggestionsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: "suggestions_total",
-			Help: "Total suggestions served",
+		RecommendationsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
+			Name: "recommendations_total",
+			Help: "Total recommendations served",
 		}, []string{"algorithm", "userId"}),
 
 		MovieImportTotal: promauto.NewCounterVec(prometheus.CounterOpts{

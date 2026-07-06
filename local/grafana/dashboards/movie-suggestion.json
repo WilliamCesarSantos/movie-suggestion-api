@@ -175,7 +175,7 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
       "id": 101,
-      "title": "Suggestions",
+      "title": "Recommendations",
       "type": "row"
     },
     {
@@ -187,11 +187,11 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
       "id": 8,
       "options": { "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
-      "title": "Suggestions by Algorithm",
+      "title": "Recommendations by Algorithm",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(rate(suggestions_total[1m])) by (algorithm)",
+          "expr": "sum(rate(recommendations_total[1m])) by (algorithm)",
           "legendFormat": "{{algorithm}}",
           "refId": "A"
         }
@@ -210,7 +210,7 @@
       "type": "piechart",
       "targets": [
         {
-          "expr": "sum(suggestions_total) by (algorithm)",
+          "expr": "sum(recommendations_total) by (algorithm)",
           "legendFormat": "{{algorithm}}",
           "refId": "A"
         }
@@ -342,7 +342,7 @@
   "time": { "from": "now-30m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Movie Suggestion",
+  "title": "Movie Recommendation",
   "uid": "movie-suggestion",
   "version": 1
 }

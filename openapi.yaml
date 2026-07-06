@@ -20,7 +20,7 @@ tags:
     description: User management
   - name: Movies
     description: Movie catalog
-  - name: Suggestions
+  - name: Recommendations
     description: Personalized movie recommendations
   - name: Import
     description: Async movie import via OMDB
@@ -203,7 +203,7 @@ paths:
         - Replaces the entire roles list when provided.
         - Empty list is allowed.
         - Roles must belong to the fixed allowlist:
-          `users:read`, `users:write`, `suggestions:read`, `movies:read`, `movies-watch:write`, `movies:write`.
+          `users:read`, `users:write`, `movies:read`, `movies-watch:write`, `movies:write`.
 
         **Password rule:**
         - Minimum 6 characters.
@@ -236,17 +236,18 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/v1/suggestions:
+  /api/v1/movies:
     get:
-      tags: [Suggestions]
-      summary: Get movie suggestions
+      tags: [Movies]
+      summary: Get recommended movies
       description: >
         Returns personalized movie recommendations for the authenticated user
         using cursor-based pagination.
-        The user ID is extracted from the ****** — no path parameter required.
+        The user ID is extracted from the token claims — no path parameter required.
         The algorithm is auto-selected based on the user's watch history
         or can be overridden via the `algorithm` query parameter.
-        Requires `suggestions:read` role.
+        Title filtering is optional and applied as case-insensitive contains.
+        Access is allowed for `movies:read`, `movies:write`, or wildcard `*`.
 
         **Auto-selection rules:**
 
@@ -255,13 +256,13 @@ paths:
         | < 5 | POPULAR |
         | 5 – 19 | CONTENT_BASED |
         | ≥ 20 | COLLABORATIVE |
-      operationId: getSuggestions
+      operationId: getRecommendedMovies
       security:
         - bearerAuth: []
       parameters:
         - name: limit
           in: query
-          description: Number of suggestions to return per page (default 10, max 50).
+          description: Number of recommended movies to return per page (default 10, max 50).
           schema:
             type: integer
             minimum: 1
@@ -276,14 +277,20 @@ paths:
           in: query
           description: Override the auto-selected recommendation algorithm.
           schema:
-            $ref: "#/components/schemas/SuggestionAlgorithm"
+            $ref: "#/components/schemas/RecommendationAlgorithm"
+        - name: title
+          in: query
+          description: Case-insensitive partial title filter applied together with algorithm results.
+          schema:
+            type: string
+            example: matrix
       responses:
         "200":
-          description: Paginated list of suggested movies
+          description: Paginated list of recommended movies
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuggestionsPageResponse"
+                $ref: "#/components/schemas/RecommendationsPageResponse"
         "400":
           description: Invalid limit or cursor parameter, or unknown algorithm
           content:
@@ -537,7 +544,7 @@ components:
           type: array
           items:
             type: string
-          example: ["users:read", "users:write", "suggestions:read", "movies:read", "movie-watch:write"]
+          example: ["users:read", "users:write", "movies:read", "movie-watch:write"]
 
     CreateUserResponse:
       type: object
@@ -582,7 +589,6 @@ components:
             enum:
               - users:read
               - users:write
-              - suggestions:read
               - movies:read
               - movies-watch:write
               - movies:write
@@ -631,7 +637,7 @@ components:
           format: date-time
           example: "2026-05-30T12:00:00Z"
         CurrentAlgorithm:
-          $ref: "#/components/schemas/SuggestionAlgorithm"
+          $ref: "#/components/schemas/RecommendationAlgorithm"
         WatchCount:
           type: integer
           example: 12
@@ -802,7 +808,7 @@ components:
           type: array
           items:
             type: string
-          example: ["users:read", "suggestions:read"]
+          example: ["users:read", "movies:read"]
         createdAt:
           type: string
           format: date-time
@@ -828,7 +834,7 @@ components:
           description: Number of items per page.
           example: 20
 
-    SuggestionsPageResponse:
+    RecommendationsPageResponse:
       type: object
       properties:
         data:
@@ -863,10 +869,10 @@ components:
           example: 10
         total:
           type: integer
-          description: Total number of matching suggestions.
+              description: Total number of matching recommended movies.
           example: 40
 
-    SuggestionAlgorithm:
+            RecommendationAlgorithm:
       type: string
       enum:
         - POPULAR

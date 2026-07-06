@@ -43,8 +43,8 @@ func (s *stubPatchUserUseCase) Execute(ctx context.Context, input domainusecase.
 
 func buildPatchUserRouter(jwtService *auth.JWTService, patchUC domainusecase.PatchUserUseCase) *chi.Mux {
 	manageUC := &integrationManageUserUseCase{}
-	suggestUC := &integrationSuggestMoviesUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, nil, patchUC, nil, nil, "test-secret", 50)
+	recommendUC := &integrationRecommendMoviesUseCase{}
+	h := handler.NewUserHandler(manageUC, recommendUC, nil, patchUC, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()

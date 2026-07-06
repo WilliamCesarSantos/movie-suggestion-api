@@ -1,19 +1,19 @@
-package suggestion_test
+package recommendation_test
 
 import (
 	"testing"
 
-	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/suggestion"
+	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/recommendation"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 )
 
 func TestAlgorithmSelector_Rules(t *testing.T) {
-	selector := suggestion.NewAlgorithmSelector(0.7, 20, 5)
+	selector := recommendation.NewAlgorithmSelector(0.7, 20, 5)
 
 	tests := []struct {
 		name     string
 		user     entity.User
-		expected entity.SuggestionAlgorithm
+		expected entity.RecommendationAlgorithm
 	}{
 		{
 			name:     "Rule 1: watchCount < 5 → POPULAR",

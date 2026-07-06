@@ -20,8 +20,8 @@ Atualizar openapi.yaml para refletir exatamente o comportamento implementado.
 - Documentar regra de visibilidade por perfil (users:read vs users:write).
 - Documentar filtros opcionais (email, name, page, pageSize).
 
-2. Suggestions
-- Atualizar GET /api/v1/suggestions para cursor-based.
+2. Recommendations
+- Atualizar GET /api/v1/recommendations para cursor-based.
 - Incluir campos de resposta: data, nextCursor, prevCursor, hasNext, hasPrev, limit, count, total.
 - Documentar erros de validacao de cursor/limit.
 

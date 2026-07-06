@@ -28,7 +28,7 @@ sep "3. Create user Alice"
 ALICE_RESP=$(curl -sf -X POST "${BASE_URL}/api/v1/users" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","suggestions:read","movies:read","movies-watch:write"]}')
+  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","movies:read","movies-watch:write"]}')
 ALICE_ID=$(echo "$ALICE_RESP" | jq -r '.id')
 echo "Alice ID: ${ALICE_ID}"
 
@@ -81,14 +81,14 @@ sep "9. Get Alice (as Admin)"
 curl -sf "${BASE_URL}/api/v1/users/${ALICE_ID}" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" | jq .
 
-sep "10. Get suggestions for Alice (auto-selected algorithm)"
-curl -sf "${BASE_URL}/api/v1/suggestions" \
+sep "10. Get recommended movies for Alice (auto-selected algorithm)"
+curl -sf "${BASE_URL}/api/v1/movies" \
   -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 
 sep "11. Finding a movie for further steps..."
-MOVIE_SUGGESTIONS=$(curl -sf "${BASE_URL}/api/v1/suggestions" \
+MOVIE_RECOMMENDATIONS=$(curl -sf "${BASE_URL}/api/v1/movies" \
   -H "Authorization: Bearer ${TOKEN_ALICE}")
-MOVIE_ID=$(echo "$MOVIE_SUGGESTIONS" | jq -r '.[0].id // empty')
+MOVIE_ID=$(echo "$MOVIE_RECOMMENDATIONS" | jq -r '.data[0].id // empty')
 
 if [ -z "$MOVIE_ID" ]; then
   echo "No movies found yet, skipping watch steps"
@@ -99,12 +99,12 @@ else
     -H "Content-Type: application/json" \
     -d '{"rating":8.5,"reaction":"liked"}' | jq .
 
-  sep "13. Get suggestions for Alice"
-  curl -sf "${BASE_URL}/api/v1/suggestions" \
+  sep "13. Get recommended movies for Alice"
+  curl -sf "${BASE_URL}/api/v1/movies" \
     -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 
-  sep "14. Get suggestions (SERENDIPITY)"
-  curl -sf "${BASE_URL}/api/v1/suggestions?algorithm=SERENDIPITY" \
+  sep "14. Get recommended movies (SERENDIPITY)"
+  curl -sf "${BASE_URL}/api/v1/movies?algorithm=SERENDIPITY" \
     -H "Authorization: Bearer ${TOKEN_ALICE}" | jq .
 
   sep "15. Get movie details"

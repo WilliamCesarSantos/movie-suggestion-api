@@ -37,7 +37,7 @@ func NewRouter(
 
 			r.With(middleware.RequireRole("users:read")).Get("/users", userHandler.ListUsers)
 
-			r.With(middleware.RequireRole("suggestions:read")).Get("/suggestions", userHandler.GetSuggestions)
+			r.With(middleware.RequireAnyRole("movies:read", "movies:write")).Get("/movies", userHandler.GetRecommendedMovies)
 
 			r.With(middleware.RequireRole("movies:read")).Get("/movies/{id}", movieHandler.GetMovie)
 			r.With(middleware.RequireRole("movies-watch:write")).Post("/movies/{id}/watched", movieHandler.RecordWatched)

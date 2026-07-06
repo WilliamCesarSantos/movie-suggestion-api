@@ -9,18 +9,18 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-type suggestionRepository struct {
+type recommendationRepository struct {
 	driver   neo4j.DriverWithContext
 	database string
 }
 
-func NewSuggestionRepository(driver neo4j.DriverWithContext, database string) repository.SuggestionRepository {
-	return &suggestionRepository{driver: driver, database: database}
+func NewRecommendationRepository(driver neo4j.DriverWithContext, database string) repository.RecommendationRepository {
+	return &recommendationRepository{driver: driver, database: database}
 }
 
-func (r *suggestionRepository) FindPopular(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+func (r *recommendationRepository) FindPopular(ctx context.Context, userID string, limit int, minRating float64, title string) ([]*entity.Movie, error) {
 	result, err := neo4j.ExecuteQuery(ctx, r.driver, cypher.Popular,
-		map[string]any{"userId": userID, "limit": limit, "minRating": minRating},
+		map[string]any{"userId": userID, "limit": limit, "minRating": minRating, "title": title},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
@@ -30,9 +30,9 @@ func (r *suggestionRepository) FindPopular(ctx context.Context, userID string, l
 	return recordsToMovies(result.Records)
 }
 
-func (r *suggestionRepository) FindContentBased(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+func (r *recommendationRepository) FindContentBased(ctx context.Context, userID string, limit int, minRating float64, title string) ([]*entity.Movie, error) {
 	result, err := neo4j.ExecuteQuery(ctx, r.driver, cypher.ContentBased,
-		map[string]any{"userId": userID, "limit": limit, "minRating": minRating},
+		map[string]any{"userId": userID, "limit": limit, "minRating": minRating, "title": title},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
@@ -42,9 +42,9 @@ func (r *suggestionRepository) FindContentBased(ctx context.Context, userID stri
 	return recordsToMovies(result.Records)
 }
 
-func (r *suggestionRepository) FindCollaborative(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+func (r *recommendationRepository) FindCollaborative(ctx context.Context, userID string, limit int, minRating float64, title string) ([]*entity.Movie, error) {
 	result, err := neo4j.ExecuteQuery(ctx, r.driver, cypher.Collaborative,
-		map[string]any{"userId": userID, "limit": limit, "minRating": minRating},
+		map[string]any{"userId": userID, "limit": limit, "minRating": minRating, "title": title},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
@@ -54,9 +54,9 @@ func (r *suggestionRepository) FindCollaborative(ctx context.Context, userID str
 	return recordsToMovies(result.Records)
 }
 
-func (r *suggestionRepository) FindHybrid(ctx context.Context, userID string, limit int, minRating float64, contentWeight, collaborativeWeight float64) ([]*entity.Movie, error) {
+func (r *recommendationRepository) FindHybrid(ctx context.Context, userID string, limit int, minRating float64, contentWeight, collaborativeWeight float64, title string) ([]*entity.Movie, error) {
 	contentResult, err := neo4j.ExecuteQuery(ctx, r.driver, cypher.ContentBased,
-		map[string]any{"userId": userID, "limit": limit, "minRating": minRating},
+		map[string]any{"userId": userID, "limit": limit, "minRating": minRating, "title": title},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
@@ -64,7 +64,7 @@ func (r *suggestionRepository) FindHybrid(ctx context.Context, userID string, li
 		return nil, err
 	}
 	collabResult, err := neo4j.ExecuteQuery(ctx, r.driver, cypher.Collaborative,
-		map[string]any{"userId": userID, "limit": limit, "minRating": minRating},
+		map[string]any{"userId": userID, "limit": limit, "minRating": minRating, "title": title},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
@@ -102,9 +102,9 @@ func (r *suggestionRepository) FindHybrid(ctx context.Context, userID string, li
 	return combined, nil
 }
 
-func (r *suggestionRepository) FindSerendipity(ctx context.Context, userID string, limit int, minRating float64) ([]*entity.Movie, error) {
+func (r *recommendationRepository) FindSerendipity(ctx context.Context, userID string, limit int, minRating float64, title string) ([]*entity.Movie, error) {
 	result, err := neo4j.ExecuteQuery(ctx, r.driver, cypher.Serendipity,
-		map[string]any{"userId": userID, "limit": limit, "serendipityMinRating": minRating},
+		map[string]any{"userId": userID, "limit": limit, "serendipityMinRating": minRating, "title": title},
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)

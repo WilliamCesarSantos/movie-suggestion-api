@@ -128,15 +128,15 @@ go run ./cmd/api
 | `OMDB_BASE_URL` | `http://www.omdbapi.com` | OMDB API base URL |
 | `OMDB_API_KEY` | _(empty)_ | OMDB API key |
 | `OMDB_TIMEOUT_SECONDS` | `10` | OMDB HTTP client timeout |
-| `SUGGESTION_DEFAULT_LIMIT` | `10` | Default number of suggestions |
-| `SUGGESTION_MAX_LIMIT` | `50` | Maximum allowed suggestions |
-| `SUGGESTION_HYBRID_CONTENT_WEIGHT` | `0.5` | Hybrid: content-based weight |
-| `SUGGESTION_HYBRID_COLLABORATIVE_WEIGHT` | `0.5` | Hybrid: collaborative weight |
-| `SUGGESTION_MIN_IMDB_RATING` | `6.0` | Minimum IMDb rating filter |
-| `SUGGESTION_SERENDIPITY_MIN_RATING` | `5.0` | Serendipity minimum rating |
-| `SUGGESTION_CONTENT_BASED_MIN_WATCHES` | `5` | Watches needed for content-based |
-| `SUGGESTION_COLLABORATIVE_MIN_WATCHES` | `20` | Watches needed for collaborative |
-| `SUGGESTION_CONTENT_PREFERENCE_THRESHOLD` | `0.7` | Content preference threshold |
+| `RECOMMENDATION_DEFAULT_LIMIT` | `10` | Default number of recommendations |
+| `RECOMMENDATION_MAX_LIMIT` | `50` | Maximum allowed recommendations |
+| `RECOMMENDATION_HYBRID_CONTENT_WEIGHT` | `0.5` | Hybrid: content-based weight |
+| `RECOMMENDATION_HYBRID_COLLABORATIVE_WEIGHT` | `0.5` | Hybrid: collaborative weight |
+| `RECOMMENDATION_MIN_IMDB_RATING` | `6.0` | Minimum IMDb rating filter |
+| `RECOMMENDATION_SERENDIPITY_MIN_RATING` | `5.0` | Serendipity minimum rating |
+| `RECOMMENDATION_CONTENT_BASED_MIN_WATCHES` | `5` | Watches needed for content-based |
+| `RECOMMENDATION_COLLABORATIVE_MIN_WATCHES` | `20` | Watches needed for collaborative |
+| `RECOMMENDATION_CONTENT_PREFERENCE_THRESHOLD` | `0.7` | Content preference threshold |
 | `SQS_QUEUE_URL` | `http://localhost:4566/000000000000/movie-import` | SQS queue URL |
 | `SQS_WORKER_COUNT` | `5` | Number of SQS consumer workers |
 | `AWS_REGION` | `us-east-1` | AWS region |
@@ -161,19 +161,20 @@ go run ./cmd/api
 | `POST` | `/api/v1/login` | None | Login and get a JWT |
 | `POST` | `/api/v1/users` | Bearer (`users:write`) | Create a new user |
 | `GET` | `/api/v1/users/{id}` | Bearer (`users:read` + owner or `*`) | Get user details |
-| `GET` | `/api/v1/suggestions` | Bearer (`suggestions:read`) | Get movie suggestions |
-| `GET` | `/api/v1/movies` | Bearer (`movies:read`) | List movies (summary fields only) |
+| `GET` | `/api/v1/movies` | Bearer (`movies:read` or `movies:write`) | Get personalized movie recommendations |
 | `GET` | `/api/v1/movies/{id}` | Bearer (`movies:read`) | Get full movie details |
 | `POST` | `/api/v1/movies/{id}/watched` | Bearer (`movies-watch:write`) | Record a watched movie for the authenticated user |
 | `POST` | `/api/v1/movie-import` | Bearer (`movies:write`) | Trigger movie import |
 | `GET` | `/metrics` | None (port 9090) | Prometheus metrics |
 
-### Query Parameters for Suggestions
+### Query Parameters for Recommended Movies
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `limit` | int | Number of suggestions (default: 10, max: 50) |
+| `limit` | int | Number of recommendations per page (default: 10, max: 50) |
+| `cursor` | string | Opaque cursor token for pagination |
 | `algorithm` | string | Override algorithm: `POPULAR`, `CONTENT_BASED`, `COLLABORATIVE`, `HYBRID`, `SERENDIPITY` |
+| `title` | string | Case-insensitive partial title filter applied together with algorithm results |
 
 > User ID is extracted automatically from the Bearer token — no path parameter required.
 
@@ -201,7 +202,7 @@ curl -X POST http://localhost:8080/api/v1/login \
 curl -X POST http://localhost:8080/api/v1/users \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","users:write","suggestions:read","movies:read","movie-watch:write"]}'
+  -d '{"name":"Alice","email":"alice@example.com","password":"s3cr3t","roles":["users:read","users:write","movies:read","movie-watch:write"]}'
 ```
 
 ### Get User Details
@@ -220,15 +221,19 @@ curl -X POST http://localhost:8080/api/v1/movies/<movie-id>/watched \
   -d '{"rating": 8.5, "reaction": "liked"}'
 ```
 
-### Get Movie Suggestions
+### Get Recommended Movies
 
 ```bash
 # Auto-selected algorithm
-curl "http://localhost:8080/api/v1/suggestions?limit=10" \
+curl "http://localhost:8080/api/v1/movies?limit=10" \
   -H "Authorization: Bearer <token>"
 
 # Override algorithm
-curl "http://localhost:8080/api/v1/suggestions?limit=5&algorithm=SERENDIPITY" \
+curl "http://localhost:8080/api/v1/movies?limit=5&algorithm=SERENDIPITY" \
+  -H "Authorization: Bearer <token>"
+
+# Refine by title (contains, case-insensitive)
+curl "http://localhost:8080/api/v1/movies?limit=5&title=matrix" \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -239,7 +244,7 @@ curl http://localhost:8080/api/v1/movies/<movie-id> \
   -H "Authorization: Bearer <token>"
 ```
 
-> **`GET /api/v1/movies`** returns a paginated list with summary fields only: `id`, `title`, `year`, `poster`, `imdbRating`.
+> **`GET /api/v1/movies`** returns personalized recommendations with pagination fields: `data`, `nextCursor`, `prevCursor`, `hasNext`, `hasPrev`, `limit`, `count`, `total`.
 >
 > **`GET /api/v1/movies/{id}`** returns the full movie object, including all available fields: `id`, `title`, `year`, `plot`, `runtime`, `poster`, `imdbRating`, `imdbId`, `genres`, `actors`, `directors`.
 
@@ -264,7 +269,7 @@ go test ./...
 go test -v ./...
 
 # Run specific package tests
-go test ./internal/application/suggestion/...
+go test ./internal/application/recommendation/...
 go test ./internal/application/usecase/...
 ```
 
@@ -287,7 +292,7 @@ movie-suggestion/
 │   │   ├── repository/                # Repository interfaces
 │   │   └── usecase/                   # Use case interfaces
 │   ├── application/
-│   │   ├── suggestion/                # Algorithm selector and dispatcher
+│   │   ├── recommendation/                # Algorithm selector and dispatcher
 │   │   └── usecase/                   # Use case implementations
 │   └── infrastructure/
 │       ├── auth/                      # JWT and password services
@@ -299,7 +304,7 @@ movie-suggestion/
 │       │   ├── cypher/                # Cypher query constants
 │       │   ├── movie_repository.go
 │       │   ├── user_repository.go
-│       │   └── suggestion_repository.go
+│       │   └── recommendation_repository.go
 │       ├── postgres/                  # PostgreSQL auth repository
 │       ├── observability/             # Prometheus metrics, OTEL tracer
 │       ├── omdb/                      # OMDB HTTP client and adapter

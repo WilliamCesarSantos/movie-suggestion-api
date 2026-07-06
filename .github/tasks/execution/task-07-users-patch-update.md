@@ -21,7 +21,7 @@ Implementar PATCH /api/v1/users/{id} com atualizacao parcial de usuario, incluin
   - substitui lista inteira
   - [] permitido
   - validar contra lista fixa permitida
-  - lista permitida: users:read, users:write, suggestions:read, movies:read, movies-watch:write, movies:write
+  - lista permitida: users:read, users:write, recommendations:read, movies:read, movies-watch:write, movies:write
 - Password:
   - minimo 6 caracteres
 - Resposta:

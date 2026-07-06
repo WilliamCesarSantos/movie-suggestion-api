@@ -2,14 +2,14 @@ package entity
 
 import "time"
 
-type SuggestionAlgorithm string
+type RecommendationAlgorithm string
 
 const (
-	AlgorithmPopular       SuggestionAlgorithm = "POPULAR"
-	AlgorithmContentBased  SuggestionAlgorithm = "CONTENT_BASED"
-	AlgorithmCollaborative SuggestionAlgorithm = "COLLABORATIVE"
-	AlgorithmHybrid        SuggestionAlgorithm = "HYBRID"
-	AlgorithmSerendipity   SuggestionAlgorithm = "SERENDIPITY"
+	AlgorithmPopular       RecommendationAlgorithm = "POPULAR"
+	AlgorithmContentBased  RecommendationAlgorithm = "CONTENT_BASED"
+	AlgorithmCollaborative RecommendationAlgorithm = "COLLABORATIVE"
+	AlgorithmHybrid        RecommendationAlgorithm = "HYBRID"
+	AlgorithmSerendipity   RecommendationAlgorithm = "SERENDIPITY"
 )
 
 type User struct {
@@ -17,7 +17,7 @@ type User struct {
 	Name             string
 	Email            string
 	CreatedAt        time.Time
-	CurrentAlgorithm SuggestionAlgorithm
+	CurrentAlgorithm RecommendationAlgorithm
 	WatchCount       int
 	LikeCount        int
 	DislikeCount     int

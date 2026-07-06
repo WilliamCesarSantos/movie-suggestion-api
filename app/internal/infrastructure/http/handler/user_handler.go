@@ -19,34 +19,34 @@ import (
 
 type UserHandler struct {
 	manageUserUC       domainusecase.ManageUserUseCase
-	suggestUC          domainusecase.SuggestMoviesUseCase
+	recommendUC          domainusecase.RecommendMoviesUseCase
 	listUsersUC        domainusecase.ListUsersUseCase
 	patchUserUC        domainusecase.PatchUserUseCase
 	authUserRepo       repository.AuthUserRepository
 	passwordService    *auth.PasswordService
 	cursorSecret       string
-	suggestionMaxLimit int
+	recommendationMaxLimit int
 }
 
 func NewUserHandler(
 	manageUserUC domainusecase.ManageUserUseCase,
-	suggestUC domainusecase.SuggestMoviesUseCase,
+	recommendUC domainusecase.RecommendMoviesUseCase,
 	listUsersUC domainusecase.ListUsersUseCase,
 	patchUserUC domainusecase.PatchUserUseCase,
 	authUserRepo repository.AuthUserRepository,
 	passwordService *auth.PasswordService,
 	cursorSecret string,
-	suggestionMaxLimit int,
+	recommendationMaxLimit int,
 ) *UserHandler {
 	return &UserHandler{
 		manageUserUC:       manageUserUC,
-		suggestUC:          suggestUC,
+		recommendUC:          recommendUC,
 		listUsersUC:        listUsersUC,
 		patchUserUC:        patchUserUC,
 		authUserRepo:       authUserRepo,
 		passwordService:    passwordService,
 		cursorSecret:       cursorSecret,
-		suggestionMaxLimit: suggestionMaxLimit,
+		recommendationMaxLimit: recommendationMaxLimit,
 	}
 }
 
@@ -280,7 +280,7 @@ func (h *UserHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
+func (h *UserHandler) GetRecommendedMovies(w http.ResponseWriter, r *http.Request) {
 	email, _ := r.Context().Value(middleware.ContextKeyUserEmail).(string)
 	if email == "" {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -308,13 +308,14 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		offset = decodedCursor.Offset
 	}
 
-	var algoOverride *entity.SuggestionAlgorithm
+	var algoOverride *entity.RecommendationAlgorithm
 	if algoStr := r.URL.Query().Get("algorithm"); algoStr != "" {
-		algo := entity.SuggestionAlgorithm(algoStr)
+		algo := entity.RecommendationAlgorithm(algoStr)
 		algoOverride = &algo
 	}
+	title := r.URL.Query().Get("title")
 
-	movies, err := h.suggestUC.Execute(r.Context(), email, h.suggestionMaxLimit, algoOverride)
+	movies, err := h.recommendUC.Execute(r.Context(), email, h.recommendationMaxLimit, algoOverride, title)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
@@ -337,7 +338,7 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		end = total
 	}
 
-	type suggestionItem struct {
+	type recommendedMovieItem struct {
 		ID         string  `json:"id"`
 		Title      string  `json:"title"`
 		Year       string  `json:"year"`
@@ -345,9 +346,9 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		ImdbRating float64 `json:"imdbRating"`
 	}
 	slicedMovies := movies[offset:end]
-	items := make([]suggestionItem, len(slicedMovies))
+	items := make([]recommendedMovieItem, len(slicedMovies))
 	for i, m := range slicedMovies {
-		items[i] = suggestionItem{
+		items[i] = recommendedMovieItem{
 			ID:         m.ID,
 			Title:      m.Title,
 			Year:       m.Year,
@@ -377,14 +378,14 @@ func (h *UserHandler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(struct {
-		Data       []suggestionItem `json:"data"`
-		NextCursor *string          `json:"nextCursor"`
-		PrevCursor *string          `json:"prevCursor"`
-		HasNext    bool             `json:"hasNext"`
-		HasPrev    bool             `json:"hasPrev"`
-		Limit      int              `json:"limit"`
-		Count      int              `json:"count"`
-		Total      int              `json:"total"`
+		Data       []recommendedMovieItem `json:"data"`
+		NextCursor *string                `json:"nextCursor"`
+		PrevCursor *string                `json:"prevCursor"`
+		HasNext    bool                   `json:"hasNext"`
+		HasPrev    bool                   `json:"hasPrev"`
+		Limit      int                    `json:"limit"`
+		Count      int                    `json:"count"`
+		Total      int                    `json:"total"`
 	}{
 		Data:       items,
 		NextCursor: nextCursor,

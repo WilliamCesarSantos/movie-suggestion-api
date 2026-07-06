@@ -7,6 +7,7 @@ MATCH (candidate:Movie)-[:HAS_GENRE]->(cg:Genre)
 WHERE NOT (u)-[:WATCHED]->(candidate)
   AND NOT cg.name IN knownGenres
   AND candidate.imdbRating >= $serendipityMinRating
+  AND ($title = '' OR toLower(candidate.title) CONTAINS toLower($title))
 RETURN candidate ORDER BY candidate.imdbRating DESC
 LIMIT $limit
 `

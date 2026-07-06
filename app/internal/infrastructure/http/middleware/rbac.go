@@ -39,6 +39,32 @@ func RequireRole(role string) func(http.Handler) http.Handler {
 	}
 }
 
+func RequireAnyRole(allowedRoles ...string) func(http.Handler) http.Handler {
+	allowed := map[string]struct{}{}
+	for _, role := range allowedRoles {
+		allowed[role] = struct{}{}
+	}
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			roles, _ := r.Context().Value(ContextKeyRoles).([]string)
+			for _, role := range roles {
+				if role == "*" {
+					next.ServeHTTP(w, r)
+					return
+				}
+				if _, ok := allowed[role]; ok {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			log.Ctx(r.Context()).Warn().Strs("requiredAnyRole", allowedRoles).Msg("forbidden: missing required roles")
+			http.Error(w, "forbidden", http.StatusForbidden)
+		})
+	}
+}
+
 func RequireOwnerOrWildcard() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
