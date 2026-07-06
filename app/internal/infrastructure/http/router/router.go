@@ -31,6 +31,7 @@ func NewRouter(
 			r.Use(authMiddleware.Authenticate)
 
 			r.With(middleware.RequireRole("users:write")).Post("/users", userHandler.CreateUser)
+			r.With(middleware.RequireRole("users:write")).Patch("/users/{id}", userHandler.PatchUser)
 
 			r.With(middleware.RequireRole("users:read"), middleware.RequireOwnerOrWildcard()).Get("/users/{id}", userHandler.GetUser)
 

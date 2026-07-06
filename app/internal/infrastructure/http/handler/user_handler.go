@@ -21,6 +21,7 @@ type UserHandler struct {
 	manageUserUC       domainusecase.ManageUserUseCase
 	suggestUC          domainusecase.SuggestMoviesUseCase
 	listUsersUC        domainusecase.ListUsersUseCase
+	patchUserUC        domainusecase.PatchUserUseCase
 	authUserRepo       repository.AuthUserRepository
 	passwordService    *auth.PasswordService
 	cursorSecret       string
@@ -31,6 +32,7 @@ func NewUserHandler(
 	manageUserUC domainusecase.ManageUserUseCase,
 	suggestUC domainusecase.SuggestMoviesUseCase,
 	listUsersUC domainusecase.ListUsersUseCase,
+	patchUserUC domainusecase.PatchUserUseCase,
 	authUserRepo repository.AuthUserRepository,
 	passwordService *auth.PasswordService,
 	cursorSecret string,
@@ -40,6 +42,7 @@ func NewUserHandler(
 		manageUserUC:       manageUserUC,
 		suggestUC:          suggestUC,
 		listUsersUC:        listUsersUC,
+		patchUserUC:        patchUserUC,
 		authUserRepo:       authUserRepo,
 		passwordService:    passwordService,
 		cursorSecret:       cursorSecret,
@@ -154,6 +157,20 @@ type listUsersResponse struct {
 	PageSize int             `json:"pageSize"`
 }
 
+type patchUserRequest struct {
+	Name     *string   `json:"name"`
+	Password *string   `json:"password"`
+	Roles    *[]string `json:"roles"`
+}
+
+type patchUserResponse struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Email     string   `json:"email"`
+	Roles     []string `json:"roles"`
+	CreatedAt string   `json:"createdAt"`
+}
+
 func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	callerEmail, _ := r.Context().Value(middleware.ContextKeyUserEmail).(string)
 	roles, _ := r.Context().Value(middleware.ContextKeyRoles).([]string)
@@ -211,6 +228,55 @@ func (h *UserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		Total:    result.Total,
 		Page:     result.Page,
 		PageSize: result.PageSize,
+	})
+}
+
+func (h *UserHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
+	if h.patchUserUC == nil {
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var req patchUserRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	callerUserID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	targetUserID := chi.URLParam(r, "id")
+
+	out, err := h.patchUserUC.Execute(r.Context(), domainusecase.PatchUserInput{
+		TargetUserID: targetUserID,
+		CallerUserID: callerUserID,
+		Name:         req.Name,
+		Password:     req.Password,
+		Roles:        req.Roles,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, entity.ErrInvalidUserPatchInput):
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		case errors.Is(err, entity.ErrUserPatchForbidden):
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		case errors.Is(err, entity.ErrAuthUserNotFound):
+			http.Error(w, "user not found", http.StatusNotFound)
+			return
+		default:
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(patchUserResponse{
+		ID:        out.ID,
+		Name:      out.Name,
+		Email:     out.Email,
+		Roles:     out.Roles,
+		CreatedAt: out.CreatedAt,
 	})
 }
 

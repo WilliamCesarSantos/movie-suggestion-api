@@ -7,13 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"time"
+
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/handler"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
 	"github.com/go-chi/chi/v5"
-	"time"
 )
 
 type stubListUsersUC struct {
@@ -28,7 +29,7 @@ func (s *stubListUsersUC) Execute(ctx context.Context, callerEmail string, calle
 func buildListUsersRouter(jwtService *auth.JWTService, listUC domainusecase.ListUsersUseCase) *chi.Mux {
 	manageUC := &integrationManageUserUseCase{}
 	suggestUC := &integrationSuggestMoviesUseCase{}
-	h := handler.NewUserHandler(manageUC, suggestUC, listUC, nil, nil, "test-secret", 50)
+	h := handler.NewUserHandler(manageUC, suggestUC, listUC, nil, nil, nil, "test-secret", 50)
 	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	r := chi.NewRouter()

@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	appusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/entity"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
-	appusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/usecase"
 )
 
 type mockAuthUserRepository struct {
@@ -19,12 +19,20 @@ func (m *mockAuthUserRepository) Create(ctx context.Context, user *entity.AuthUs
 	return nil
 }
 
+func (m *mockAuthUserRepository) FindByID(ctx context.Context, id string) (*entity.AuthUser, error) {
+	return nil, entity.ErrAuthUserNotFound
+}
+
 func (m *mockAuthUserRepository) FindByEmail(ctx context.Context, email string) (*entity.AuthUser, error) {
 	return nil, entity.ErrAuthUserNotFound
 }
 
 func (m *mockAuthUserRepository) List(ctx context.Context, filters repository.AuthUserFilters) ([]*entity.AuthUser, int, error) {
 	return m.listFn(ctx, filters)
+}
+
+func (m *mockAuthUserRepository) Update(ctx context.Context, id string, update repository.AuthUserUpdate) error {
+	return nil
 }
 
 func makeUser(id, name, email string) *entity.AuthUser {
