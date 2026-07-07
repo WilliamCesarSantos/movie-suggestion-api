@@ -8,6 +8,7 @@ import (
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/rs/zerolog/log"
 )
 
 type movieRepository struct {
@@ -20,6 +21,9 @@ func NewMovieRepository(driver neo4j.DriverWithContext, database string) reposit
 }
 
 func (r *movieRepository) FindByID(ctx context.Context, id string) (*entity.Movie, error) {
+	logger := log.Ctx(ctx).With().Str("logger", "repo.neo4j.movie").Logger()
+	logger.Info().Str("movieId", id).Msg("finding movie by id")
+
 	result, err := neo4j.ExecuteQuery(ctx, r.driver,
 		`MATCH (m:Movie {id: $id})
 		OPTIONAL MATCH (m)-[:HAS_GENRE]->(g:Genre)
@@ -34,15 +38,26 @@ func (r *movieRepository) FindByID(ctx context.Context, id string) (*entity.Movi
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
 	if err != nil {
+		logger.Error().Err(err).Str("movieId", id).Msg("failed to find movie by id")
 		return nil, err
 	}
 	if len(result.Records) == 0 {
+		logger.Warn().Str("movieId", id).Msg("movie not found by id")
 		return nil, entity.ErrMovieNotFound
 	}
-	return recordToMovieFull(result.Records[0])
+	movie, err := recordToMovieFull(result.Records[0])
+	if err != nil {
+		logger.Error().Err(err).Str("movieId", id).Msg("failed to map movie by id")
+		return nil, err
+	}
+	logger.Info().Str("movieId", id).Msg("movie found by id")
+	return movie, nil
 }
 
 func (r *movieRepository) FindByImdbID(ctx context.Context, imdbID string) (*entity.Movie, error) {
+	logger := log.Ctx(ctx).With().Str("logger", "repo.neo4j.movie").Logger()
+	logger.Info().Str("imdbId", imdbID).Msg("finding movie by imdbId")
+
 	result, err := neo4j.ExecuteQuery(ctx, r.driver,
 		"MATCH (m:Movie {imdbId: $imdbId}) RETURN m",
 		map[string]any{"imdbId": imdbID},
@@ -50,15 +65,26 @@ func (r *movieRepository) FindByImdbID(ctx context.Context, imdbID string) (*ent
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
 	if err != nil {
+		logger.Error().Err(err).Str("imdbId", imdbID).Msg("failed to find movie by imdbId")
 		return nil, err
 	}
 	if len(result.Records) == 0 {
+		logger.Warn().Str("imdbId", imdbID).Msg("movie not found by imdbId")
 		return nil, entity.ErrMovieNotFound
 	}
-	return recordToMovie(result.Records[0])
+	movie, err := recordToMovie(result.Records[0])
+	if err != nil {
+		logger.Error().Err(err).Str("imdbId", imdbID).Msg("failed to map movie by imdbId")
+		return nil, err
+	}
+	logger.Info().Str("imdbId", imdbID).Msg("movie found by imdbId")
+	return movie, nil
 }
 
 func (r *movieRepository) Upsert(ctx context.Context, movie *entity.Movie) error {
+	logger := log.Ctx(ctx).With().Str("logger", "repo.neo4j.movie").Logger()
+	logger.Info().Str("movieId", movie.ID).Str("imdbId", movie.ImdbID).Msg("upserting movie")
+
 	if movie.ID == "" {
 		movie.ID = uuid.New().String()
 	}
@@ -104,7 +130,12 @@ FOREACH (d IN $directors | MERGE (dir:Director {name: d.name}) MERGE (m)-[:DIREC
 		neo4j.EagerResultTransformer,
 		neo4j.ExecuteQueryWithDatabase(r.database),
 	)
-	return err
+	if err != nil {
+		logger.Error().Err(err).Str("movieId", movie.ID).Str("imdbId", movie.ImdbID).Msg("failed to upsert movie")
+		return err
+	}
+	logger.Info().Str("movieId", movie.ID).Str("imdbId", movie.ImdbID).Msg("movie upserted")
+	return nil
 }
 
 func recordToMovie(record *neo4j.Record) (*entity.Movie, error) {

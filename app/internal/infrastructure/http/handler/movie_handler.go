@@ -10,6 +10,7 @@ import (
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 )
 
 type MovieHandler struct {
@@ -23,15 +24,21 @@ func NewMovieHandler(getMovieUC domainusecase.GetMovieUseCase, manageUserUC doma
 
 func (h *MovieHandler) GetMovie(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	logger := log.Ctx(r.Context()).With().Str("logger", "http.movie_handler").Logger()
+	logger.Info().Str("movieId", id).Msg("get movie request received")
+
 	movie, err := h.getMovieUC.GetByID(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, entity.ErrMovieNotFound) {
+			logger.Warn().Str("movieId", id).Msg("movie not found")
 			http.Error(w, "movie not found", http.StatusNotFound)
 			return
 		}
+		logger.Error().Err(err).Str("movieId", id).Msg("failed to get movie")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	logger.Info().Str("movieId", id).Msg("movie returned")
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(movie)
 }
@@ -52,18 +59,23 @@ type watchedResponse struct {
 func (h *MovieHandler) RecordWatched(w http.ResponseWriter, r *http.Request) {
 	movieID := chi.URLParam(r, "id")
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	logger := log.Ctx(r.Context()).With().Str("logger", "http.movie_handler").Logger()
+	logger.Info().Str("userId", userID).Str("movieId", movieID).Msg("record watched request received")
 
 	var req recordWatchedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Warn().Str("userId", userID).Str("movieId", movieID).Msg("record watched rejected: invalid body")
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if _, err := h.getMovieUC.GetByID(r.Context(), movieID); err != nil {
 		if errors.Is(err, entity.ErrMovieNotFound) {
+			logger.Warn().Str("movieId", movieID).Msg("record watched rejected: movie not found")
 			http.Error(w, "movie not found", http.StatusNotFound)
 			return
 		}
+		logger.Error().Err(err).Str("movieId", movieID).Msg("failed to validate movie before recording watched")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -71,12 +83,15 @@ func (h *MovieHandler) RecordWatched(w http.ResponseWriter, r *http.Request) {
 	_, err := h.manageUserUC.RecordWatched(r.Context(), userID, movieID, req.Rating, req.Reaction)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) || errors.Is(err, entity.ErrMovieNotFound) {
+			logger.Warn().Err(err).Str("userId", userID).Str("movieId", movieID).Msg("record watched rejected: not found")
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		logger.Error().Err(err).Str("userId", userID).Str("movieId", movieID).Msg("failed to record watched movie")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+	logger.Info().Str("userId", userID).Str("movieId", movieID).Msg("watched movie recorded")
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(watchedResponse{
 		UserID:    userID,

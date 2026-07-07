@@ -5,6 +5,7 @@ import (
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
+	"github.com/rs/zerolog/log"
 )
 
 type listUsersUseCase struct {
@@ -16,6 +17,9 @@ func NewListUsersUseCase(authUserRepo repository.AuthUserRepository) domainuseca
 }
 
 func (uc *listUsersUseCase) Execute(ctx context.Context, callerEmail string, callerHasWrite bool, input domainusecase.ListUsersInput) (*domainusecase.ListUsersOutput, error) {
+	logger := log.Ctx(ctx).With().Str("logger", "usecase.list_users").Logger()
+	logger.Info().Str("callerEmail", callerEmail).Bool("callerHasWrite", callerHasWrite).Int("page", input.Page).Int("pageSize", input.PageSize).Msg("listing users")
+
 	filters := repository.AuthUserFilters{
 		Name:     input.Name,
 		Page:     input.Page,
@@ -31,6 +35,7 @@ func (uc *listUsersUseCase) Execute(ctx context.Context, callerEmail string, cal
 
 	users, total, err := uc.authUserRepo.List(ctx, filters)
 	if err != nil {
+		logger.Error().Err(err).Interface("filters", filters).Msg("failed to list users")
 		return nil, err
 	}
 
@@ -46,10 +51,12 @@ func (uc *listUsersUseCase) Execute(ctx context.Context, callerEmail string, cal
 		pageSize = 100
 	}
 
-	return &domainusecase.ListUsersOutput{
+	output := &domainusecase.ListUsersOutput{
 		Users:    users,
 		Total:    total,
 		Page:     page,
 		PageSize: pageSize,
-	}, nil
+	}
+	logger.Info().Int("total", total).Int("page", page).Int("pageSize", pageSize).Int("returned", len(users)).Msg("users listed")
+	return output, nil
 }

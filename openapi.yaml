@@ -869,10 +869,9 @@ components:
           example: 10
         total:
           type: integer
-              description: Total number of matching recommended movies.
+          description: Total number of matching recommended movies.
           example: 40
-
-            RecommendationAlgorithm:
+    RecommendationAlgorithm:
       type: string
       enum:
         - POPULAR

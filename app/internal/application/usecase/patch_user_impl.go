@@ -10,6 +10,7 @@ import (
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/repository"
 	domainusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/domain/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/auth"
+	"github.com/rs/zerolog/log"
 )
 
 var allowedPatchRoles = map[string]struct{}{
@@ -35,20 +36,27 @@ func NewPatchUserUseCase(authUserRepo repository.AuthUserRepository, userRepo re
 }
 
 func (uc *patchUserUseCase) Execute(ctx context.Context, input domainusecase.PatchUserInput) (*domainusecase.PatchUserOutput, error) {
+	logger := log.Ctx(ctx).With().Str("logger", "usecase.patch_user").Logger()
+	logger.Info().Str("targetUserId", input.TargetUserID).Str("callerUserId", input.CallerUserID).Msg("patch user requested")
+
 	if input.Name == nil && input.Password == nil && input.Roles == nil {
+		logger.Warn().Str("targetUserId", input.TargetUserID).Msg("patch user rejected: empty payload")
 		return nil, entity.ErrInvalidUserPatchInput
 	}
 	if input.TargetUserID == "" || input.CallerUserID == "" {
+		logger.Warn().Msg("patch user rejected: missing user ids")
 		return nil, entity.ErrInvalidUserPatchInput
 	}
 
 	isOwner := input.TargetUserID == input.CallerUserID
 	if !isOwner && (input.Name != nil || input.Password != nil) {
+		logger.Warn().Str("targetUserId", input.TargetUserID).Str("callerUserId", input.CallerUserID).Msg("patch user forbidden: non-owner change")
 		return nil, entity.ErrUserPatchForbidden
 	}
 
 	targetUser, err := uc.authUserRepo.FindByID(ctx, input.TargetUserID)
 	if err != nil {
+		logger.Error().Err(err).Str("targetUserId", input.TargetUserID).Msg("failed to load target auth user")
 		return nil, err
 	}
 
@@ -58,6 +66,7 @@ func (uc *patchUserUseCase) Execute(ctx context.Context, input domainusecase.Pat
 	if input.Name != nil {
 		trimmedName := strings.TrimSpace(*input.Name)
 		if trimmedName == "" {
+			logger.Warn().Str("targetUserId", input.TargetUserID).Msg("patch user rejected: empty name")
 			return nil, entity.ErrInvalidUserPatchInput
 		}
 		update.Name = &trimmedName
@@ -67,6 +76,7 @@ func (uc *patchUserUseCase) Execute(ctx context.Context, input domainusecase.Pat
 
 	if input.Password != nil {
 		if len(*input.Password) < 6 {
+			logger.Warn().Str("targetUserId", input.TargetUserID).Msg("patch user rejected: password too short")
 			return nil, entity.ErrInvalidUserPatchInput
 		}
 		hashedPassword, hashErr := uc.passwordService.Hash(*input.Password)
@@ -78,6 +88,7 @@ func (uc *patchUserUseCase) Execute(ctx context.Context, input domainusecase.Pat
 
 	if input.Roles != nil {
 		if !isAllowedRoles(*input.Roles) {
+			logger.Warn().Str("targetUserId", input.TargetUserID).Msg("patch user rejected: invalid roles")
 			return nil, entity.ErrInvalidUserPatchInput
 		}
 		rolesCopy := append([]string(nil), (*input.Roles)...)
@@ -86,14 +97,18 @@ func (uc *patchUserUseCase) Execute(ctx context.Context, input domainusecase.Pat
 	}
 
 	if err := uc.authUserRepo.Update(ctx, input.TargetUserID, update); err != nil {
+		logger.Error().Err(err).Str("targetUserId", input.TargetUserID).Msg("failed to update auth user")
 		return nil, err
 	}
 
 	if nameChanged {
 		if err := uc.syncGraphUserName(ctx, targetUser.ID, targetUser.Email, targetUser.Name); err != nil {
+			logger.Error().Err(err).Str("targetUserId", targetUser.ID).Msg("failed to sync graph user name")
 			return nil, err
 		}
 	}
+
+	logger.Info().Str("targetUserId", targetUser.ID).Bool("nameChanged", nameChanged).Bool("passwordChanged", input.Password != nil).Bool("rolesChanged", input.Roles != nil).Msg("patch user completed")
 
 	return &domainusecase.PatchUserOutput{
 		ID:        targetUser.ID,
