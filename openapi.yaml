@@ -34,9 +34,23 @@ paths:
       summary: Health check
       description: Returns the health status of the API and its dependencies.
       operationId: healthCheck
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
       responses:
         "200":
           description: Service is healthy or degraded
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Service is degraded
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -48,6 +62,8 @@ paths:
       summary: Login
       description: Authenticates a user and returns a signed JWT token.
       operationId: login
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
       requestBody:
         required: true
         content:
@@ -57,6 +73,9 @@ paths:
       responses:
         "200":
           description: Login successful
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -76,6 +95,8 @@ paths:
       operationId: createUser
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
       requestBody:
         required: true
         content:
@@ -85,6 +106,9 @@ paths:
       responses:
         "201":
           description: User created
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -97,6 +121,9 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           description: Email already exists
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             text/plain:
               schema:
@@ -118,6 +145,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
         - name: email
           in: query
           description: Filter by exact email address.
@@ -149,6 +177,9 @@ paths:
       responses:
         "200":
           description: Paginated list of users
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -171,10 +202,14 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
         - $ref: "#/components/parameters/UserID"
       responses:
         "200":
           description: User details
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -211,6 +246,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
         - $ref: "#/components/parameters/UserID"
       requestBody:
         required: true
@@ -221,6 +257,9 @@ paths:
       responses:
         "200":
           description: User updated
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -260,6 +299,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
         - name: limit
           in: query
           description: Number of recommended movies to return per page (default 10, max 50).
@@ -287,12 +327,18 @@ paths:
       responses:
         "200":
           description: Paginated list of recommended movies
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RecommendationsPageResponse"
         "400":
           description: Invalid limit or cursor parameter, or unknown algorithm
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             text/plain:
               schema:
@@ -316,10 +362,14 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
         - $ref: "#/components/parameters/MovieID"
       responses:
         "200":
           description: Full movie details
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -342,6 +392,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
         - $ref: "#/components/parameters/MovieID"
       requestBody:
         required: true
@@ -352,6 +403,9 @@ paths:
       responses:
         "200":
           description: Watch recorded
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -379,6 +433,8 @@ paths:
       operationId: triggerImport
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdHeader"
       requestBody:
         required: true
         content:
@@ -388,6 +444,9 @@ paths:
       responses:
         "202":
           description: Import triggered
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationIdHeader"
           content:
             application/json:
               schema:
@@ -413,6 +472,15 @@ components:
       bearerFormat: JWT
 
   parameters:
+    CorrelationIdHeader:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Optional correlation ID for distributed tracing. If omitted, the API generates one.
+      schema:
+        type: string
+        example: 6d7a1a61-6fd8-4af2-9524-98d77c0a3c34
+
     UserID:
       name: id
       in: path
@@ -436,6 +504,9 @@ components:
   responses:
     BadRequest:
       description: Bad request
+      headers:
+        X-Correlation-ID:
+          $ref: "#/components/headers/CorrelationIdHeader"
       content:
         text/plain:
           schema:
@@ -444,6 +515,9 @@ components:
 
     Unauthorized:
       description: Missing or invalid JWT token
+      headers:
+        X-Correlation-ID:
+          $ref: "#/components/headers/CorrelationIdHeader"
       content:
         text/plain:
           schema:
@@ -452,6 +526,9 @@ components:
 
     Forbidden:
       description: Insufficient permissions
+      headers:
+        X-Correlation-ID:
+          $ref: "#/components/headers/CorrelationIdHeader"
       content:
         text/plain:
           schema:
@@ -460,6 +537,9 @@ components:
 
     NotFound:
       description: Resource not found
+      headers:
+        X-Correlation-ID:
+          $ref: "#/components/headers/CorrelationIdHeader"
       content:
         text/plain:
           schema:
@@ -468,11 +548,21 @@ components:
 
     InternalError:
       description: Internal server error
+      headers:
+        X-Correlation-ID:
+          $ref: "#/components/headers/CorrelationIdHeader"
       content:
         text/plain:
           schema:
             type: string
             example: internal server error
+
+  headers:
+    CorrelationIdHeader:
+      description: Correlation ID used for end-to-end request tracing.
+      schema:
+        type: string
+        example: 6d7a1a61-6fd8-4af2-9524-98d77c0a3c34
 
   schemas:
     HealthResponse:
@@ -482,14 +572,17 @@ components:
           type: string
           enum: [ok, degraded]
           example: ok
-        neo4j:
-          type: string
-          enum: [ok, unavailable]
-          example: ok
-        time:
+        timestamp:
           type: string
           format: date-time
           example: "2026-05-30T12:00:00Z"
+        services:
+          type: object
+          properties:
+            neo4j:
+              type: string
+              enum: [ok, unavailable]
+              example: ok
 
     LoginRequest:
       type: object
@@ -544,7 +637,7 @@ components:
           type: array
           items:
             type: string
-          example: ["users:read", "users:write", "movies:read", "movie-watch:write"]
+          example: ["users:read", "users:write", "movies:read", "movies-watch:write"]
 
     CreateUserResponse:
       type: object
