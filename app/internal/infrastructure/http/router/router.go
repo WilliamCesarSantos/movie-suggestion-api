@@ -42,7 +42,7 @@ func NewRouter(
 			r.With(middleware.RequireRole("movies:read")).Get("/movies/{id}", movieHandler.GetMovie)
 			r.With(middleware.RequireRole("movies-watch:write")).Post("/movies/{id}/watched", movieHandler.RecordWatched)
 
-			r.With(middleware.RequireRole("movies:write")).Post("/movie-import", importHandler.TriggerImport)
+			r.With(middleware.RequireRole("movies:write")).Post("/movies-import", importHandler.TriggerImport)
 		})
 	})
 

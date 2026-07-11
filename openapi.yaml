@@ -367,7 +367,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /api/v1/movie-import:
+  /api/v1/movies-import:
     post:
       tags: [Import]
       summary: Trigger movie import

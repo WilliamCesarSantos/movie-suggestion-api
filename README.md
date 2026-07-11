@@ -164,7 +164,7 @@ go run ./cmd/api
 | `GET` | `/api/v1/movies` | Bearer (`movies:read` or `movies:write`) | Get personalized movie recommendations |
 | `GET` | `/api/v1/movies/{id}` | Bearer (`movies:read`) | Get full movie details |
 | `POST` | `/api/v1/movies/{id}/watched` | Bearer (`movies-watch:write`) | Record a watched movie for the authenticated user |
-| `POST` | `/api/v1/movie-import` | Bearer (`movies:write`) | Trigger movie import |
+| `POST` | `/api/v1/movies-import` | Bearer (`movies:write`) | Trigger movie import |
 | `GET` | `/metrics` | None (port 9090) | Prometheus metrics |
 
 ### Query Parameters for Recommended Movies
@@ -251,7 +251,7 @@ curl http://localhost:8080/api/v1/movies/<movie-id> \
 ### Trigger Movie Import
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/movie-import \
+curl -X POST http://localhost:8080/api/v1/movies-import \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"searchTerms": ["inception", "matrix", "interstellar", "tropa", "compadecida", "chefão" "pulp fiction"], "maxPages": 3}'

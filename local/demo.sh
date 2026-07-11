@@ -40,7 +40,7 @@ TOKEN_ALICE=$(echo "$ALICE_LOGIN" | jq -r '.token')
 echo "Alice token: ${TOKEN_ALICE:0:50}..."
 
 sep "5. Trigger movie import"
-curl -sf -X POST "${BASE_URL}/api/v1/movie-import" \
+curl -sf -X POST "${BASE_URL}/api/v1/movies-import" \
   -H "Authorization: Bearer ${TOKEN_ADMIN}" \
   -H "Content-Type: application/json" \
   -d '{"searchTerms":["inception", "matrix", "interstellar", "tropa", "compadecida", "chefão", "pulp fiction"],"maxPages":5}'
