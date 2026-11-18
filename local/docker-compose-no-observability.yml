@@ -1,0 +1,91 @@
+version: "3.9"
+services:
+  movie-suggestion-api-neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/password
+      EXTENSION_SCRIPT: /init/init.sh
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password \"MATCH (u:User {email: 'william_cesar_santos@hotmail.com'}) RETURN u.id\" | grep -q 519fbd7e"]
+      interval: 10s
+      timeout: 10s
+      retries: 35
+      start_period: 30s
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+      - ./neo4j:/init:ro
+
+  movie-suggestion-api-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: movie_suggestion
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d movie_suggestion"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  movie-suggestion-api-localstack:
+    image: localstack/localstack:4.14
+    environment:
+      SERVICES: sqs,ssm
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./localstack:/etc/localstack/init/ready.d
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/init/ready | grep -q '\"completed\": true'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  movie-suggestion-api:
+    image: williamcesarsantos/movie-suggestion-api:latest
+    build:
+      context: ..
+      dockerfile: app/docker/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      NEO4J_URI: bolt://movie-suggestion-api-neo4j:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: password
+      NEO4J_DATABASE: neo4j
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://movie-suggestion-api-localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_QUEUE_URL: http://movie-suggestion-api-localstack:4566/000000000000/movie-import
+      POSTGRES_DSN: postgres://postgres:password@movie-suggestion-api-postgres:5432/movie_suggestion?sslmode=disable
+      JWT_SECRET: dev-secret
+      JWT_EXPIRY_HOURS: "24"
+      ARGON2_PEPPER: movie-suggestion-123456
+      OTEL_EXPORTER_OTLP_ENDPOINT: localhost:4317
+      OTEL_SERVICE_NAME: movie-suggestion-api
+      SERVER_PORT: "8080"
+      METRICS_PORT: "9090"
+      OMDB_API_KEY: ${OMDB_API_KEY:?set OMDB_API_KEY in local/.env (see local/.env.example)}
+    depends_on:
+      movie-suggestion-api-neo4j:
+        condition: service_healthy
+      movie-suggestion-api-localstack:
+        condition: service_healthy
+      movie-suggestion-api-postgres:
+        condition: service_healthy
+
+volumes:
+  neo4j_data:
+  postgres_data:

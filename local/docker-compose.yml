@@ -4,12 +4,19 @@ services:
     image: neo4j:5
     environment:
       NEO4J_AUTH: neo4j/password
+      EXTENSION_SCRIPT: /init/init.sh
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password \"MATCH (u:User {email: 'william_cesar_santos@hotmail.com'}) RETURN u.id\" | grep -q 519fbd7e"]
+      interval: 10s
+      timeout: 10s
+      retries: 35
+      start_period: 30s
     ports:
       - "7474:7474"
       - "7687:7687"
     volumes:
       - neo4j_data:/data
-      - ./neo4j/init.cypher:/var/lib/neo4j/import/init.cypher
+      - ./neo4j:/init:ro
 
   movie-suggestion-api-postgres:
     image: postgres:16
@@ -38,6 +45,12 @@ services:
       - "4566:4566"
     volumes:
       - ./localstack:/etc/localstack/init/ready.d
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/init/ready | grep -q '\"completed\": true'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
 
   movie-suggestion-api-prometheus:
     image: prom/prometheus:v3.3.1
@@ -89,12 +102,12 @@ services:
       OTEL_SERVICE_NAME: movie-suggestion-api
       SERVER_PORT: "8080"
       METRICS_PORT: "9090"
-      OMDB_API_KEY: your-omdb-api-key
+      OMDB_API_KEY: ${OMDB_API_KEY:?set OMDB_API_KEY in local/.env (see local/.env.example)}
     depends_on:
       movie-suggestion-api-neo4j:
-        condition: service_started
+        condition: service_healthy
       movie-suggestion-api-localstack:
-        condition: service_started
+        condition: service_healthy
       movie-suggestion-api-jaeger:
         condition: service_started
       movie-suggestion-api-postgres:
