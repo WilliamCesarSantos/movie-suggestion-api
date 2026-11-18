@@ -3,6 +3,7 @@ package omdb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -36,6 +37,7 @@ type MovieResponse struct {
 	Actors     string `json:"Actors"`
 	Director   string `json:"Director"`
 	Response   string `json:"Response"`
+	Error      string `json:"Error"`
 }
 
 type Client struct {
@@ -69,19 +71,19 @@ func (c *Client) Search(ctx context.Context, term string, page int) ([]SearchRes
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OMDB search request failed for term %q: %w", term, redactURLError(err))
 	}
 	defer resp.Body.Close()
 
 	var result SearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OMDB search decode failed for term %q (status %d): %w", term, resp.StatusCode, err)
 	}
 	if result.Response != "True" {
 		if strings.EqualFold(result.Error, "Movie not found!") {
 			return []SearchResult{}, nil
 		}
-		return nil, fmt.Errorf("OMDB search failed for term %q", term)
+		return nil, fmt.Errorf("OMDB search failed for term %q page %d (status %d): %s", term, page, resp.StatusCode, result.Error)
 	}
 	return result.Search, nil
 }
@@ -94,16 +96,16 @@ func (c *Client) FetchByImdbID(ctx context.Context, imdbID string) (*entity.Movi
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OMDB fetch request failed for %s: %w", imdbID, redactURLError(err))
 	}
 	defer resp.Body.Close()
 
 	var result MovieResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OMDB fetch decode failed for %s (status %d): %w", imdbID, resp.StatusCode, err)
 	}
 	if result.Response != "True" {
-		return nil, fmt.Errorf("OMDB movie not found: %s", imdbID)
+		return nil, fmt.Errorf("OMDB fetch failed for %s (status %d): %s", imdbID, resp.StatusCode, result.Error)
 	}
 
 	rating, _ := strconv.ParseFloat(result.ImdbRating, 64)
@@ -138,6 +140,15 @@ func (c *Client) FetchByImdbID(ctx context.Context, imdbID string) (*entity.Movi
 		Actors:     entityActors,
 		Directors:  entityDirectors,
 	}, nil
+}
+
+// redactURLError drops the request URL from transport errors, since it carries the API key.
+func redactURLError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
 }
 
 func parseCSV(s string) []string {

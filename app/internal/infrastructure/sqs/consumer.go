@@ -3,6 +3,7 @@ package sqs
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	appusecase "github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/application/usecase"
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/http/middleware"
@@ -10,6 +11,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+)
+
+const (
+	receiveInitialBackoff = 500 * time.Millisecond
+	receiveMaxBackoff     = 30 * time.Second
 )
 
 type Consumer struct {
@@ -37,6 +43,9 @@ func (c *Consumer) Start(ctx context.Context) {
 		go c.worker(ctx, msgCh)
 	}
 
+	backoff := receiveInitialBackoff
+	failures := 0
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -50,8 +59,32 @@ func (c *Consumer) Start(ctx context.Context) {
 				MessageAttributeNames: []string{"correlationId"},
 			})
 			if err != nil {
-				c.logger.Error().Str("correlationId", "system").Err(err).Msg("SQS receive error")
+				if ctx.Err() != nil {
+					continue
+				}
+				failures++
+				c.logger.Error().
+					Str("correlationId", "system").
+					Str("queueUrl", c.queueURL).
+					Int("consecutiveFailures", failures).
+					Dur("retryIn", backoff).
+					Err(err).
+					Msg("SQS receive error")
+				select {
+				case <-ctx.Done():
+				case <-time.After(backoff):
+				}
+				backoff = min(backoff*2, receiveMaxBackoff)
 				continue
+			}
+			if failures > 0 {
+				c.logger.Info().
+					Str("correlationId", "system").
+					Str("queueUrl", c.queueURL).
+					Int("previousFailures", failures).
+					Msg("SQS receive recovered")
+				failures = 0
+				backoff = receiveInitialBackoff
 			}
 			for _, msg := range out.Messages {
 				select {
