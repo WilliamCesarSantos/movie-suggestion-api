@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/WilliamCesarSantos/movie-suggestion-api/app/internal/infrastructure/observability"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
@@ -58,7 +59,13 @@ func ObservabilityMiddleware(metrics *observability.Metrics) func(http.Handler) 
 			metrics.HttpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, statusStr).Inc()
 			metrics.HttpRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(duration)
 
+			route := ""
+			if rctx := chi.RouteContext(r.Context()); rctx != nil {
+				route = rctx.RoutePattern()
+			}
 			log.Ctx(ctx).Info().
+				Str("logger", "http.access").
+				Str("route", route).
 				Int("status", rw.status).
 				Float64("durationMs", duration*1000).
 				Msg("request completed")

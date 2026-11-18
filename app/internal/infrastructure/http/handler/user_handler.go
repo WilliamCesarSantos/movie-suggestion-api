@@ -315,7 +315,7 @@ func (h *UserHandler) PatchUser(w http.ResponseWriter, r *http.Request) {
 func (h *UserHandler) GetRecommendedMovies(w http.ResponseWriter, r *http.Request) {
 	email, _ := r.Context().Value(middleware.ContextKeyUserEmail).(string)
 	logger := log.Ctx(r.Context()).With().Str("logger", "http.user_handler").Logger()
-	logger.Info().Str("email", email).Msg("recommendations request received")
+	logger.Info().Msg("recommendations request received")
 	if email == "" {
 		logger.Warn().Msg("recommendations rejected: unauthorized")
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -355,20 +355,20 @@ func (h *UserHandler) GetRecommendedMovies(w http.ResponseWriter, r *http.Reques
 	movies, err := h.recommendUC.Execute(r.Context(), email, h.recommendationMaxLimit, algoOverride, title)
 	if err != nil {
 		if errors.Is(err, entity.ErrUserNotFound) {
-			logger.Warn().Str("email", email).Msg("recommendations rejected: user not found")
+			logger.Warn().Msg("recommendations rejected: user not found")
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
 		if errors.Is(err, entity.ErrAlgorithmNotFound) {
-			logger.Warn().Str("email", email).Msg("recommendations rejected: algorithm not found")
+			logger.Warn().Msg("recommendations rejected: algorithm not found")
 			http.Error(w, "algorithm not found", http.StatusBadRequest)
 			return
 		}
-		logger.Error().Err(err).Str("email", email).Msg("recommendations failed")
+		logger.Error().Err(err).Msg("recommendations failed")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
-	logger.Info().Str("email", email).Int("total", len(movies)).Int("limit", limit).Msg("recommendations resolved")
+	logger.Info().Int("total", len(movies)).Int("limit", limit).Msg("recommendations resolved")
 
 	total := len(movies)
 	if offset > total {

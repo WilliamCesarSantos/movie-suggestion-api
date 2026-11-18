@@ -27,6 +27,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"gorm.io/driver/postgres"
@@ -259,9 +260,9 @@ func registerLifecycle(p serverParams) {
 				Handler: metricsMux,
 			}
 			go func() {
-				p.Logger.Info().Str("correlationId", "system").Int("port", p.Config.Server.MetricsPort).Msg("metrics server starting")
+				p.Logger.Info().Str("correlationId", "system").Str("logger", "bootstrap").Int("port", p.Config.Server.MetricsPort).Msg("metrics server starting")
 				if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error().Str("correlationId", "system").Err(err).Msg("metrics server error")
+					p.Logger.Error().Str("correlationId", "system").Str("logger", "bootstrap").Err(err).Msg("metrics server error")
 				}
 			}()
 
@@ -270,9 +271,9 @@ func registerLifecycle(p serverParams) {
 				Handler: p.Router,
 			}
 			go func() {
-				p.Logger.Info().Str("correlationId", "system").Int("port", p.Config.Server.Port).Msg("API server starting")
+				p.Logger.Info().Str("correlationId", "system").Str("logger", "bootstrap").Int("port", p.Config.Server.Port).Msg("API server starting")
 				if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					p.Logger.Error().Str("correlationId", "system").Err(err).Msg("API server error")
+					p.Logger.Error().Str("correlationId", "system").Str("logger", "bootstrap").Err(err).Msg("API server error")
 				}
 			}()
 
@@ -283,13 +284,13 @@ func registerLifecycle(p serverParams) {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			p.Logger.Info().Str("correlationId", "system").Msg("shutting down...")
+			p.Logger.Info().Str("correlationId", "system").Str("logger", "bootstrap").Msg("shutting down...")
 			consumerCancel()
 			if err := apiServer.Shutdown(ctx); err != nil {
-				p.Logger.Error().Str("correlationId", "system").Err(err).Msg("API server shutdown error")
+				p.Logger.Error().Str("correlationId", "system").Str("logger", "bootstrap").Err(err).Msg("API server shutdown error")
 			}
 			if err := metricsServer.Shutdown(ctx); err != nil {
-				p.Logger.Error().Str("correlationId", "system").Err(err).Msg("metrics server shutdown error")
+				p.Logger.Error().Str("correlationId", "system").Str("logger", "bootstrap").Err(err).Msg("metrics server shutdown error")
 			}
 			return nil
 		},
@@ -300,9 +301,14 @@ func registerTracer(lc fx.Lifecycle, cfg *config.Config, logger zerolog.Logger) 
 	var tracerShutdown func(context.Context) error
 	lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
+			// Route OTel SDK errors (e.g. exporter timeouts) through zerolog instead of the stdlib logger.
+			otelLogger := logger.With().Str("correlationId", "system").Str("logger", "otel").Logger()
+			otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+				otelLogger.Warn().Err(err).Msg("opentelemetry error")
+			}))
 			shutdown, err := observability.InitTracer(cfg.Otel)
 			if err != nil {
-				logger.Warn().Str("correlationId", "system").Err(err).Msg("failed to initialize tracer, continuing without tracing")
+				logger.Warn().Str("correlationId", "system").Str("logger", "bootstrap").Err(err).Msg("failed to initialize tracer, continuing without tracing")
 				return nil
 			}
 			tracerShutdown = shutdown
